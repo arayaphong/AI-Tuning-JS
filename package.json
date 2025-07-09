@@ -1,0 +1,37 @@
+{
+  "name": "ai-tuning-js",
+  "version": "1.0.0",
+  "main": "index.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs",
+    "test": "node index.mjs --test",
+    "dev": "nodemon index.mjs",
+    "system-info": "node index.mjs --system-info"
+  },
+  "keywords": [
+    "ai",
+    "gemini",
+    "vertex-ai",
+    "google-cloud"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Minimal Gemini AI test using Vertex AI and Google Cloud ADC authentication",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "@google-cloud/vertexai": "^1.10.0",
+    "@google/generative-ai": "^0.24.1",
+    "chalk": "^5.4.1",
+    "dotenv": "^17.1.0",
+    "ink": "^6.0.1",
+    "ink-markdown": "^1.0.4",
+    "react": "^19.1.0",
+    "systeminformation": "^5.27.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
