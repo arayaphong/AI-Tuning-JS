@@ -5,8 +5,13 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import si from 'systeminformation';
+import chalk from 'chalk';
+import { MongoMCPClient, formatBytes } from './mongodb-mcp-integration.js';
 
 const execAsync = promisify(exec);
+
+// MongoDB MCP client instance
+let mongoMCP = null;
 
 /**
  * RELIABLE SHELL COMMAND SYSTEM - NO FUNCTION CALLING
@@ -136,15 +141,9 @@ async function getFileSize(filePath) {
   }
 }
 
-function formatBytes(bytes) {
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  if (bytes === 0) return '0 Bytes';
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-}
-
 /**
  * Process user input and execute shell commands based on keywords
+ * Enhanced with MongoDB command detection
  */
 async function processShellCommands(prompt) {
   const lowerPrompt = prompt.toLowerCase();
@@ -213,6 +212,58 @@ async function processShellCommands(prompt) {
     console.log(`🔧 Detected: command execution "${command}"`);
     const result = await shellCommands.executeCommand(command);
     shellResults.push(`COMMAND:\n${result}`);
+  }
+
+  // MongoDB-specific keyword detection
+  if (lowerPrompt.includes('database') || lowerPrompt.includes('mongo') || lowerPrompt.includes('collection')) {
+    console.log('🔧 Detected: MongoDB request');
+    
+    if (lowerPrompt.includes('list databases') || lowerPrompt.includes('show databases')) {
+      const result = await mongoCommands.listDatabases();
+      shellResults.push(`MONGO DATABASES:\n${result}`);
+    }
+    
+    else if (lowerPrompt.includes('collections')) {
+      const dbMatch = prompt.match(/(?:in|from)\s+database[s]?\s+(\w+)/i) || 
+                     prompt.match(/database[s]?\s+(\w+)\s+collections/i) ||
+                     prompt.match(/collections\s+(?:in|from)\s+(\w+)/i);
+      const database = dbMatch ? dbMatch[1] : 'ai_tuning';
+      const result = await mongoCommands.listCollections(database);
+      shellResults.push(`MONGO COLLECTIONS:\n${result}`);
+    }
+    
+    else if (lowerPrompt.includes('schema')) {
+      const collectionMatch = prompt.match(/schema\s+(?:for\s+)?(\w+)/i) ||
+                             prompt.match(/(\w+)\s+schema/i);
+      const collection = collectionMatch ? collectionMatch[1] : 'training_data';
+      const result = await mongoCommands.getCollectionSchema(collection);
+      shellResults.push(`MONGO SCHEMA:\n${result}`);
+    }
+    
+    else if (lowerPrompt.includes('find') || lowerPrompt.includes('search')) {
+      const collectionMatch = prompt.match(/(?:in|from)\s+(\w+)/i) ||
+                             prompt.match(/find\s+(\w+)/i) ||
+                             prompt.match(/search\s+(\w+)/i);
+      const collection = collectionMatch ? collectionMatch[1] : 'training_data';
+      const result = await mongoCommands.findDocuments(collection);
+      shellResults.push(`MONGO DOCUMENTS:\n${result}`);
+    }
+    
+    else if (lowerPrompt.includes('count')) {
+      const collectionMatch = prompt.match(/count\s+(?:documents\s+)?(?:in\s+)?(\w+)/i) ||
+                             prompt.match(/(\w+)\s+count/i);
+      const collection = collectionMatch ? collectionMatch[1] : 'training_data';
+      const result = await mongoCommands.countDocuments(collection);
+      shellResults.push(`MONGO COUNT:\n${result}`);
+    }
+    
+    else if (lowerPrompt.includes('aggregate')) {
+      const collectionMatch = prompt.match(/aggregate\s+(?:on\s+)?(\w+)/i) ||
+                             prompt.match(/(\w+)\s+aggregate/i);
+      const collection = collectionMatch ? collectionMatch[1] : 'training_data';
+      const result = await mongoCommands.runAggregation(collection);
+      shellResults.push(`MONGO AGGREGATION:\n${result}`);
+    }
   }
 
   return shellResults;
@@ -300,4 +351,232 @@ export function listShellCommands() {
   console.log('   📁 Files: "list files", "directory"');
   console.log('   🔄 Git: "git status", "git log"');
   console.log('   ⚙️  Commands: "run <command>", "execute <command>"');
+  console.log();
+  listMongoCommands();
+}
+
+/**
+ * Initialize MongoDB MCP client
+ * @returns {Promise<MongoMCPClient|null>} The MongoDB MCP client or null if initialization failed
+ */
+export async function initializeMongoMCP() {
+  try {
+    mongoMCP = new MongoMCPClient({
+      readOnly: process.env.MDB_MCP_READ_ONLY === 'true',
+      indexCheck: process.env.MDB_MCP_INDEX_CHECK === 'true'
+    });
+    
+    const success = await mongoMCP.initialize();
+    if (!success) {
+      console.warn(chalk.yellow('⚠️ MongoDB MCP initialization failed'));
+      mongoMCP = null;
+    }
+    return mongoMCP;
+  } catch (error) {
+    console.warn(chalk.yellow('⚠️ MongoDB MCP not available:'), error.message);
+    return null;
+  }
+}
+
+/**
+ * MongoDB commands implementation
+ */
+export const mongoCommands = {
+  /**
+   * List available databases
+   * @returns {Promise<string>} Formatted result
+   */
+  async listDatabases() {
+    if (!mongoMCP || !mongoMCP.connected) return '❌ MongoDB MCP not connected';
+    
+    try {
+      const result = await mongoMCP.executeMongoCommand('mcp_mongo_list-databases');
+      
+      let output = '📊 Available Databases:\n';
+      if (result && result.databases && Array.isArray(result.databases)) {
+        result.databases.forEach(db => {
+          output += `   - ${db.name} (${formatBytes(db.sizeOnDisk || 0)})\n`;
+        });
+      } else {
+        output += '   No databases found\n';
+      }
+      return output;
+    } catch (error) {
+      return `❌ Error listing databases: ${error.message}`;
+    }
+  },
+
+  /**
+   * List collections in a database
+   * @param {string} database - Database name
+   * @returns {Promise<string>} Formatted result
+   */
+  async listCollections(database = '') {
+    if (!mongoMCP || !mongoMCP.connected) return '❌ MongoDB MCP not connected';
+    
+    try {
+      const result = await mongoMCP.executeMongoCommand('mcp_mongo_list-collections', { database });
+      
+      let output = `📁 Collections in "${database || 'default'}":\n`;
+      if (result && result.collections && Array.isArray(result.collections)) {
+        result.collections.forEach(collection => {
+          output += `   - ${collection.name} (${collection.type || 'collection'})\n`;
+        });
+      } else {
+        output += '   No collections found\n';
+      }
+      return output;
+    } catch (error) {
+      return `❌ Error listing collections: ${error.message}`;
+    }
+  },
+
+  /**
+   * Find documents in a collection
+   * @param {string} collection - Collection name
+   * @param {string} database - Database name
+   * @param {Object} query - Query filter
+   * @param {number} limit - Maximum documents to return
+   * @returns {Promise<string>} Formatted result
+   */
+  async findDocuments(collection = 'training_data', database = '', query = {}, limit = 10) {
+    if (!mongoMCP || !mongoMCP.connected) return '❌ MongoDB MCP not connected';
+    
+    try {
+      const result = await mongoMCP.executeMongoCommand('mcp_mongo_find', {
+        collection,
+        database,
+        filter: query,
+        limit
+      });
+      
+      let output = `🔍 Documents in "${collection}":\n`;
+      if (result && result.documents && Array.isArray(result.documents)) {
+        if (result.documents.length === 0) {
+          output += '   No documents found matching the query\n';
+        } else {
+          result.documents.forEach((doc, index) => {
+            output += `\n   Document ${index + 1}:\n`;
+            output += `   ${JSON.stringify(doc, null, 2).replace(/\n/g, '\n   ')}\n`;
+          });
+          output += `\n   Total: ${result.documents.length} document(s) (limit: ${limit})\n`;
+        }
+      } else {
+        output += '   No documents found\n';
+      }
+      return output;
+    } catch (error) {
+      return `❌ Error finding documents: ${error.message}`;
+    }
+  },
+
+  /**
+   * Get schema information for a collection
+   * @param {string} collection - Collection name
+   * @param {string} database - Database name
+   * @returns {Promise<string>} Formatted result
+   */
+  async getCollectionSchema(collection = 'training_data', database = '') {
+    if (!mongoMCP || !mongoMCP.connected) return '❌ MongoDB MCP not connected';
+    
+    try {
+      const result = await mongoMCP.executeMongoCommand('mcp_mongo_collection-schema', { 
+        collection,
+        database 
+      });
+      
+      let output = `📋 Schema for "${collection}":\n`;
+      if (result && result.schema) {
+        Object.entries(result.schema).forEach(([field, info]) => {
+          const type = typeof info === 'object' ? info.type : info;
+          const required = info.required ? ' (required)' : '';
+          output += `   - ${field}: ${type}${required}\n`;
+        });
+      } else {
+        output += '   Schema information not available\n';
+      }
+      return output;
+    } catch (error) {
+      return `❌ Error getting schema: ${error.message}`;
+    }
+  },
+
+  /**
+   * Count documents in a collection
+   * @param {string} collection - Collection name
+   * @param {string} database - Database name
+   * @param {Object} query - Query filter
+   * @returns {Promise<string>} Formatted result
+   */
+  async countDocuments(collection = 'training_data', database = '', query = {}) {
+    if (!mongoMCP || !mongoMCP.connected) return '❌ MongoDB MCP not connected';
+    
+    try {
+      const result = await mongoMCP.executeMongoCommand('mcp_mongo_count', {
+        collection,
+        database,
+        query
+      });
+      
+      return `📊 Document count in "${collection}": ${result.count || 0}`;
+    } catch (error) {
+      return `❌ Error counting documents: ${error.message}`;
+    }
+  },
+
+  /**
+   * Run aggregation pipeline on a collection
+   * @param {string} collection - Collection name
+   * @param {Array} pipeline - Aggregation pipeline
+   * @returns {Promise<string>} Formatted result
+   */
+  async runAggregation(collection = 'training_data', pipeline = []) {
+    if (!mongoMCP || !mongoMCP.connected) return '❌ MongoDB MCP not connected';
+    
+    try {
+      // Default pipeline to group by metadata type
+      if (pipeline.length === 0) {
+        pipeline = [
+          { $group: { _id: '$metadata.type', count: { $sum: 1 } } },
+          { $sort: { count: -1 } }
+        ];
+      }
+
+      const result = await mongoMCP.executeMongoCommand('mcp_mongo_aggregate', {
+        collection,
+        pipeline
+      });
+      
+      let output = `🔄 Aggregation results for "${collection}":\n`;
+      if (result && result.results && Array.isArray(result.results)) {
+        if (result.results.length === 0) {
+          output += '   No results from aggregation\n';
+        } else {
+          result.results.forEach((doc, index) => {
+            output += `\n   Result ${index + 1}:\n`;
+            output += `   ${JSON.stringify(doc, null, 2).replace(/\n/g, '\n   ')}\n`;
+          });
+          output += `\n   Total: ${result.results.length} result(s)\n`;
+        }
+      } else {
+        output += '   No aggregation results\n';
+      }
+      return output;
+    } catch (error) {
+      return `❌ Error running aggregation: ${error.message}`;
+    }
+  }
+};
+
+/**
+ * List available MongoDB command keywords
+ */
+export function listMongoCommands() {
+  console.log('🗄️ MongoDB Command Keywords:');
+  console.log('   📊 Databases: "list databases", "show databases"');
+  console.log('   📁 Collections: "collections in database_name"');
+  console.log('   📋 Schema: "schema for collection_name"');
+  console.log('   🔍 Find: "find in collection_name", "search in collection_name"');
+  console.log('   📊 Count: "count documents in collection_name"');
+  console.log('   🔄 Aggregate: "aggregate collection_name"');
 }

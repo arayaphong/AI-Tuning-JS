@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { initializeGoogleAI, generateContent, listShellCommands } from './src/utils/google-ai-integration.js';
+import { initializeGoogleAI, generateContent, listShellCommands, initializeMongoMCP, listMongoCommands } from './src/utils/google-ai-integration.js';
 import { 
   renderChatMessage, 
   renderHelpContent, 
@@ -23,16 +23,26 @@ async function handleSpecialCommands(input, rl) {
   switch (command) {
     case '/commands':
     case '/tools':
-      await renderSystemInfo('Available Shell Commands', 'These keywords trigger shell commands when mentioned in your messages:');
+      await renderSystemInfo('Available Commands', 'These keywords trigger shell and MongoDB commands when mentioned in your messages:');
       listShellCommands();
+      return true;
+      
+    case '/mongo':
+      await renderSystemInfo('MongoDB Commands', 'MongoDB MCP integration commands:');
+      listMongoCommands();
       return true;
       
     case '/help':
       const helpCommands = [
         {
           name: '/commands',
-          description: 'List all available shell command keywords',
+          description: 'List all available shell command and MongoDB keywords',
           examples: ['/commands', '/tools']
+        },
+        {
+          name: '/mongo',
+          description: 'Show MongoDB MCP integration commands',
+          examples: ['/mongo']
         },
         {
           name: '/help',
@@ -80,16 +90,25 @@ async function handleSpecialCommands(input, rl) {
 - "Show me recent git commits"
 - "What git branch am I on?"
 
+## MongoDB Operations
+- "List all **databases**"
+- "Show **collections** in ai_tuning database"
+- "Get **schema** for training_data collection"
+- "**Find** documents in training_data"
+- "**Count** documents in experiments"
+- "**Aggregate** training_data by type"
+
 ## Command Execution
 - "Run pwd"
 - "Execute date"
 - "Run ps aux"
 
 ## Combined Requests
-- "Show my memory usage and list files"
-- "What's my git status and system info?"
+- "Show my memory usage and list databases"
+- "What's my git status and MongoDB collections?"
+- "List files and show training data schema"
 
-*Keywords are automatically detected and trigger shell commands!*`;
+*Keywords are automatically detected and trigger shell/MongoDB commands!*`;
       
       await smartRender(exampleContent);
       return true;
@@ -115,10 +134,10 @@ async function handleSpecialCommands(input, rl) {
  * Display startup banner
  */
 function showBanner() {
-  console.log(chalk.green.bold('🤖 Gemini AI Chatbot with Shell Commands'));
-  console.log(chalk.gray('═'.repeat(55)));
-  console.log(chalk.yellow('💡 Use natural language - keywords trigger shell commands!'));
-  console.log(chalk.gray('Type /help for commands or just start chatting!\n'));
+  console.log(chalk.green.bold('🤖 Gemini AI Chatbot with Shell & MongoDB Commands'));
+  console.log(chalk.gray('═'.repeat(60)));
+  console.log(chalk.yellow('💡 Use natural language - keywords trigger shell & MongoDB commands!'));
+  console.log(chalk.gray('Type /help for commands, /mongo for MongoDB tools, or just start chatting!\n'));
 }
 
 /**
@@ -136,6 +155,10 @@ async function startChatbot() {
             location: GOOGLE_CLOUD_LOCATION,
             apiKey: GOOGLE_AI_API_KEY
         });
+        
+        // Initialize MongoDB MCP
+        await initializeMongoMCP();
+        
     } catch (error) {
         console.error(chalk.red('❌ Failed to initialize AI:'), error.message);
         process.exit(1);
@@ -148,9 +171,9 @@ async function startChatbot() {
     });
 
     // Show available shell command keywords on startup
-    console.log(chalk.cyan('Available shell command keywords:'));
+    console.log(chalk.cyan('Available command keywords:'));
     listShellCommands();
-    console.log(chalk.gray('\nJust ask naturally - keywords will trigger shell commands!\n'));
+    console.log(chalk.gray('\nJust ask naturally - keywords will trigger shell and MongoDB commands!\n'));
     rl.prompt();
 
     rl.on('line', async (line) => {

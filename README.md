@@ -1,6 +1,6 @@
-# AI-Tuning-JS with ink-markdown Integration
+# AI-Tuning-JS with MongoDB MCP Integration
 
-A Node.js AI chatbot with enhanced markdown rendering for beautiful chat output.
+A Node.js AI chatbot with enhanced markdown rendering and MongoDB Model Context Protocol (MCP) integration for beautiful chat output and database interactions.
 
 ## Features
 
@@ -14,6 +14,7 @@ A Node.js AI chatbot with enhanced markdown rendering for beautiful chat output.
 ### 🤖 AI-Powered Chat
 - Google Generative AI integration
 - Keyword-based shell command execution
+- **MongoDB MCP integration** for database interactions
 - System information retrieval
 - Interactive command-line interface
 
@@ -99,6 +100,35 @@ The AI automatically detects these keywords and executes system commands:
 - **System**: `system` → Shows system information
 - **Files**: `list files`, `directory` → Lists files
 - **Git**: `git status`, `git log` → Git operations
+
+## MongoDB Command Keywords
+
+The AI automatically detects these keywords and executes MongoDB operations:
+
+- **Databases**: `databases`, `list databases` → Shows available databases
+- **Collections**: `collections in database_name` → Lists collections in a database
+- **Schema**: `schema for collection_name` → Shows collection schema
+- **Find**: `find in collection_name` → Finds documents in a collection
+- **Count**: `count documents in collection_name` → Counts documents
+- **Aggregate**: `aggregate collection_name` → Runs aggregation pipeline
+
+### MongoDB Setup
+
+1. **Local MongoDB**: Install MongoDB locally and ensure it's running
+2. **MongoDB Atlas**: Use a cloud MongoDB instance
+3. **Environment Variables**: Configure in `.env` file:
+
+```bash
+# Local MongoDB
+MDB_MCP_CONNECTION_STRING=mongodb://localhost:27017/ai_tuning
+
+# Or Atlas
+MDB_MCP_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/ai_tuning
+
+# Optional settings
+MDB_MCP_READ_ONLY=false
+MDB_MCP_INDEX_CHECK=true
+```
 
 ## Markdown Renderer API
 
@@ -226,7 +256,26 @@ The fallback renderer still provides excellent formatting with:
 
 ## Examples
 
-See `examples/basic-google-ai.js` for AI integration patterns.
+See `examples/basic-google-ai.js` for AI integration patterns and `examples/mongodb-mcp-example.js` for MongoDB MCP integration examples.
+
+### Natural Language MongoDB Queries
+
+```
+💬 You: "Show me all databases"
+🤖 AI: I found 4 databases: admin, config, local, and ai_tuning...
+
+💬 You: "List collections in ai_tuning database"  
+🤖 AI: The ai_tuning database contains: training_data, models, experiments...
+
+💬 You: "What's the schema for training_data?"
+🤖 AI: The training_data collection has fields: _id (ObjectId), name (String)...
+
+💬 You: "Find some documents in training_data"
+🤖 AI: I found 2 documents in training_data collection...
+
+💬 You: "Show my memory usage and list databases"
+🤖 AI: [Shows both system memory info AND MongoDB databases]
+```
 
 ## License
 
