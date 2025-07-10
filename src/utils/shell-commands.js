@@ -90,18 +90,8 @@ export const shellCommands = {
    * @param {string} command - Command to execute
    * @returns {Promise<string>} Command output
    */
-  async executeCommand(command) {
-    const safeCommands = [
-      'ls', 'pwd', 'date', 'whoami', 'uname', 'df', 'du', 'ps',
-      'npm', 'node', 'cat', 'head', 'tail', 'grep', 'find'
-    ];
-    
+  async executeCommand(command) {    
     const commandParts = command.trim().split(' ');
-    const baseCommand = commandParts[0];
-    
-    if (!safeCommands.includes(baseCommand)) {
-      return `❌ Command "${baseCommand}" not allowed. Safe commands: ${safeCommands.join(', ')}`;
-    }
     
     try {
       const { stdout, stderr } = await execAsync(command, { 
