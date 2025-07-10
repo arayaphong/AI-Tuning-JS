@@ -14,7 +14,7 @@ A Node.js AI chatbot with enhanced markdown rendering and MongoDB Model Context 
 ### 🤖 AI-Powered Chat
 - Google Generative AI integration
 - Keyword-based shell command execution
-- **MongoDB MCP integration** for database interactions
+- **TRUE MongoDB MCP integration** (pure MCP protocol only)
 - System information retrieval
 - Interactive command-line interface
 
@@ -112,23 +112,38 @@ The AI automatically detects these keywords and executes MongoDB operations:
 - **Count**: `count documents in collection_name` → Counts documents
 - **Aggregate**: `aggregate collection_name` → Runs aggregation pipeline
 
-### MongoDB Setup
+### MongoDB MCP Integration (TRUE MCP ONLY)
 
-1. **Local MongoDB**: Install MongoDB locally and ensure it's running
-2. **MongoDB Atlas**: Use a cloud MongoDB instance
-3. **Environment Variables**: Configure in `.env` file:
+**IMPORTANT**: This project uses ONLY the TRUE MongoDB Model Context Protocol (MCP). No direct MongoDB connections or fallbacks are supported.
+
+#### Requirements
+- **VS Code** with MongoDB MCP extension installed, OR
+- **MCP Server** running with MongoDB MCP tools available
+- Valid MongoDB connection string
+
+#### Environment Setup
+Configure in `.env` file:
 
 ```bash
-# Local MongoDB
-MDB_MCP_CONNECTION_STRING=mongodb://localhost:27017/ai_tuning
+# MongoDB Atlas (recommended)
+MDB_MCP_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/database
 
-# Or Atlas
-MDB_MCP_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/ai_tuning
+# Or MongoDB URI
+MDB_MCP_CONNECTION_STRING=mongodb://localhost:27017/database
 
 # Optional settings
 MDB_MCP_READ_ONLY=false
 MDB_MCP_INDEX_CHECK=true
 ```
+
+#### Testing MongoDB MCP
+```bash
+npm run test:mongo
+# or
+node examples/mongodb-mcp-example.js
+```
+
+**Note**: The application will fail if TRUE MCP tools are not available. This is by design to ensure pure MCP protocol usage.
 
 ## Markdown Renderer API
 

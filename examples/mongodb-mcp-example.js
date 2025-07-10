@@ -2,7 +2,14 @@
 
 /**
  * MongoDB MCP Integration Example
- * Demonstrates how to use MongoDB commands with the AI chatbot
+ * Demonstrates how to use MongoDB commands with the AI chatbot using TRUE MCP protocol
+ * 
+ * REQUIREMENTS:
+ * - VS Code with MongoDB MCP extension installed, OR
+ * - MCP server running with MongoDB MCP tools available
+ * - Valid MongoDB connection string in .env file
+ * 
+ * This example uses ONLY the TRUE MCP protocol - no fallbacks or simulations.
  */
 
 import { config } from 'dotenv';
@@ -28,9 +35,10 @@ async function testMongoMCPIntegration() {
     console.log(chalk.blue('2. Initializing MongoDB MCP...'));
     const mongoClient = await initializeMongoMCP();
     if (mongoClient) {
-      console.log(chalk.green('✅ MongoDB MCP initialized\n'));
+      console.log(chalk.green('✅ MongoDB MCP initialized (TRUE MCP protocol)\n'));
     } else {
-      console.log(chalk.yellow('⚠️ MongoDB MCP using simulation mode\n'));
+      console.log(chalk.red('❌ MongoDB MCP initialization failed - TRUE MCP environment required\n'));
+      process.exit(1);
     }
     
     // Test MongoDB commands directly

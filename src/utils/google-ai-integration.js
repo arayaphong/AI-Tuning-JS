@@ -214,11 +214,17 @@ async function processShellCommands(prompt) {
     shellResults.push(`COMMAND:\n${result}`);
   }
 
-  // MongoDB-specific keyword detection
-  if (lowerPrompt.includes('database') || lowerPrompt.includes('mongo') || lowerPrompt.includes('collection')) {
-    console.log('🔧 Detected: MongoDB request');
+  // MongoDB-specific keyword detection - REQUIRES #mongo prefix
+  if (lowerPrompt.startsWith('#mongo') || prompt.startsWith('#mongo')) {
+    console.log('🔧 Detected: MongoDB/MCP request');
     
-    if (lowerPrompt.includes('list databases') || lowerPrompt.includes('show databases')) {
+    // MCP status check
+    if (lowerPrompt.includes('mcp status') || lowerPrompt.includes('server status') || lowerPrompt.includes('connection status')) {
+      const result = await mongoCommands.getMCPStatus();
+      shellResults.push(`MCP STATUS:\n${result}`);
+    }
+    
+    else if (lowerPrompt.includes('list databases') || lowerPrompt.includes('show databases')) {
       const result = await mongoCommands.listDatabases();
       shellResults.push(`MONGO DATABASES:\n${result}`);
     }
@@ -232,11 +238,41 @@ async function processShellCommands(prompt) {
       shellResults.push(`MONGO COLLECTIONS:\n${result}`);
     }
     
-    else if (lowerPrompt.includes('schema')) {
-      const collectionMatch = prompt.match(/schema\s+(?:for\s+)?(\w+)/i) ||
-                             prompt.match(/(\w+)\s+schema/i);
-      const collection = collectionMatch ? collectionMatch[1] : 'training_data';
-      const result = await mongoCommands.getCollectionSchema(collection);
+    else if (lowerPrompt.includes('schema') || lowerPrompt.includes('examine')) {
+      // Updated regex patterns to handle collection/database names with underscores and other characters
+      const collectionMatch = prompt.match(/(?:schema|examine)\s+(?:of\s+)?(?:collection\s+)?(?:named\s+)?['"]*([a-zA-Z0-9_]+)['"]*\s+(?:in\s+)?(?:database\s+)?(?:named\s+)?['"]*([a-zA-Z0-9_]+)?['"]*?/i) ||
+                             prompt.match(/collection\s+(?:named\s+)?['"]*([a-zA-Z0-9_]+)['"]*\s+in\s+(?:database\s+)?(?:named\s+)?['"]*([a-zA-Z0-9_]+)['"]*/) ||
+                             prompt.match(/['"]*([a-zA-Z0-9_]+)['"]*\s+(?:schema|examine)/i) ||
+                             prompt.match(/['"]*([a-zA-Z0-9_]+)['"]*\s+in\s+['"]*([a-zA-Z0-9_]+)['"]*/) ||
+                             prompt.match(/(?:schema|examine)\s+(?:for\s+)?['"]*([a-zA-Z0-9_]+)['"]*$/i);
+      
+      let collection = 'training_data';
+      let database = 'ai_tuning';
+      
+      if (collectionMatch) {
+        if (collectionMatch[2]) {
+          // Pattern with both collection and database
+          collection = collectionMatch[1];
+          database = collectionMatch[2];
+        } else if (collectionMatch[1]) {
+          // Pattern with just collection
+          collection = collectionMatch[1];
+          // Try to extract database from other parts of the prompt
+          const dbMatch = prompt.match(/(?:in|from)\s+(?:database\s+)?(?:named\s+)?['"]*([a-zA-Z0-9_]+)['"]*|['"]*([a-zA-Z0-9_]+)['"]*\s+database/i);
+          if (dbMatch) {
+            database = dbMatch[1] || dbMatch[2];
+          }
+        }
+      }
+      
+      // Additional check for database in the format "in database named 'database'"
+      const inDbMatch = prompt.match(/in\s+(?:database\s+)?(?:named\s+)?['"]*([a-zA-Z0-9_]+)['"]*(?:\s*\([^)]*\))?$/i);
+      if (inDbMatch) {
+        database = inDbMatch[1];
+      }
+      
+      console.log(`🔍 Examining collection "${collection}" in database "${database}"`);
+      const result = await mongoCommands.getCollectionSchema(collection, database);
       shellResults.push(`MONGO SCHEMA:\n${result}`);
     }
     
@@ -480,7 +516,7 @@ export const mongoCommands = {
     if (!mongoMCP || !mongoMCP.connected) return '❌ MongoDB MCP not connected';
     
     try {
-      const result = await mongoMCP.executeMongoCommand('mcp_mongo_collection-schema', { 
+      const result = await mongoMCP.executeMongoCommand('mcp_mongo_collection_schema', { 
         collection,
         database 
       });
@@ -565,6 +601,45 @@ export const mongoCommands = {
     } catch (error) {
       return `❌ Error running aggregation: ${error.message}`;
     }
+  },
+
+  /**
+   * Get MCP server status
+   * @returns {Promise<string>} Formatted status information
+   */
+  async getMCPStatus() {
+    if (!mongoMCP) {
+      return '❌ MongoDB MCP client not initialized';
+    }
+    
+    try {
+      // Get detailed status
+      const status = mongoMCP.getMCPServerStatus();
+      
+      let output = '📊 MCP Server Status:\n';
+      output += `   🔌 Server Process: ${status.serverProcess}\n`;
+      output += `   🔗 Connection: ${status.connectionStatus}\n`;
+      output += `   🖥️  Environment: ${status.isVSCode ? 'VS Code' : 'Terminal'}\n`;
+      output += `   ✅ Available Tools: ${status.availableTools.length}/7\n`;
+      
+      if (status.availableTools.length > 0) {
+        output += '   \n   Available MCP Tools:\n';
+        status.availableTools.forEach(tool => {
+          output += `      ✓ ${tool}\n`;
+        });
+      }
+      
+      if (status.missingTools.length > 0) {
+        output += '   \n   Missing MCP Tools:\n';
+        status.missingTools.forEach(tool => {
+          output += `      ✗ ${tool}\n`;
+        });
+      }
+      
+      return output;
+    } catch (error) {
+      return `❌ Error getting MCP status: ${error.message}`;
+    }
   }
 };
 
@@ -572,11 +647,12 @@ export const mongoCommands = {
  * List available MongoDB command keywords
  */
 export function listMongoCommands() {
-  console.log('🗄️ MongoDB Command Keywords:');
-  console.log('   📊 Databases: "list databases", "show databases"');
-  console.log('   📁 Collections: "collections in database_name"');
-  console.log('   📋 Schema: "schema for collection_name"');
-  console.log('   🔍 Find: "find in collection_name", "search in collection_name"');
-  console.log('   📊 Count: "count documents in collection_name"');
-  console.log('   🔄 Aggregate: "aggregate collection_name"');
+  console.log('🗄️ MongoDB Command Keywords (require #mongo prefix):');
+  console.log('   � Status: "#mongo mcp status", "#mongo server status", "#mongo connection status"');
+  console.log('   �📊 Databases: "#mongo list databases", "#mongo show databases"');
+  console.log('   📁 Collections: "#mongo collections in database_name"');
+  console.log('   📋 Schema: "#mongo schema for collection_name", "#mongo examine collection_name"');
+  console.log('   🔍 Find: "#mongo find in collection_name", "#mongo search in collection_name"');
+  console.log('   📊 Count: "#mongo count documents in collection_name"');
+  console.log('   🔄 Aggregate: "#mongo aggregate collection_name"');
 }

@@ -8,6 +8,8 @@
     "test": "node index.mjs --test",
     "test:mongo": "node examples/mongodb-mcp-example.js",
     "dev": "nodemon index.mjs",
+    "dev:real": "MCP_REAL_DEV=true node index.mjs",
+    "dev:real-watch": "MCP_REAL_DEV=true nodemon index.mjs",
     "system-info": "node index.mjs --system-info"
   },
   "keywords": [

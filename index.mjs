@@ -90,13 +90,14 @@ async function handleSpecialCommands(input, rl) {
 - "Show me recent git commits"
 - "What git branch am I on?"
 
-## MongoDB Operations
-- "List all **databases**"
-- "Show **collections** in ai_tuning database"
-- "Get **schema** for training_data collection"
-- "**Find** documents in training_data"
-- "**Count** documents in experiments"
-- "**Aggregate** training_data by type"
+## MongoDB Operations (require #mongo prefix)
+- "#mongo list all **databases**"
+- "#mongo show **collections** in ai_tuning database"
+- "#mongo get **schema** for training_data collection"
+- "#mongo **examine** collection history_near_by_location in monitoring"
+- "#mongo **find** documents in training_data"
+- "#mongo **count** documents in experiments"
+- "#mongo **aggregate** training_data by type"
 
 ## Command Execution
 - "Run pwd"
@@ -108,7 +109,7 @@ async function handleSpecialCommands(input, rl) {
 - "What's my git status and MongoDB collections?"
 - "List files and show training data schema"
 
-*Keywords are automatically detected and trigger shell/MongoDB commands!*`;
+*Keywords are automatically detected and trigger shell commands. MongoDB commands require #mongo prefix!*`;
       
       await smartRender(exampleContent);
       return true;
