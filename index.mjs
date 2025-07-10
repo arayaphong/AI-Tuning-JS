@@ -5,7 +5,8 @@ import {
   renderChatMessage, 
   renderHelpContent, 
   renderSystemInfo,
-  smartRender 
+  smartRender,
+  renderOriginalResponse
 } from './src/utils/markdown-renderer.js';
 
 import dotenv from 'dotenv';
@@ -14,6 +15,9 @@ import chalk from 'chalk';
 
 dotenv.config();
 
+// Global setting for response rendering
+let preserveOriginalResponse = false;
+
 /**
  * Handle special CLI commands
  */
@@ -21,6 +25,13 @@ async function handleSpecialCommands(input, rl) {
   const command = input.toLowerCase().trim();
   
   switch (command) {
+    case '/original':
+      preserveOriginalResponse = !preserveOriginalResponse;
+      const status = preserveOriginalResponse ? 'enabled' : 'disabled';
+      console.log(chalk.yellow(`📝 Original response mode ${status}`));
+      console.log(chalk.gray(`   AI responses will ${preserveOriginalResponse ? 'NOT' : ''} be formatted with markdown`));
+      return true;
+      
     case '/commands':
     case '/tools':
       await renderSystemInfo('Available Commands', 'These keywords trigger shell and MongoDB commands when mentioned in your messages:');
@@ -34,6 +45,11 @@ async function handleSpecialCommands(input, rl) {
       
     case '/help':
       const helpCommands = [
+        {
+          name: '/original',
+          description: 'Toggle between original AI response (no formatting) and markdown formatted response',
+          examples: ['/original']
+        },
         {
           name: '/commands',
           description: 'List all available shell command and MongoDB keywords',
@@ -202,12 +218,20 @@ async function startChatbot() {
             process.stdout.clearLine();
             process.stdout.cursorTo(0);
 
-            // Display response using ink-markdown for rich markdown rendering
-            await renderChatMessage(response, {
-              prefix: '🤖 Gemini:',
-              showTimestamp: false,
-              addSpacing: true
-            });
+            // Display response using original or formatted rendering based on user preference
+            if (preserveOriginalResponse) {
+                await renderOriginalResponse(response, {
+                    prefix: '🤖 Gemini:',
+                    showTimestamp: false,
+                    addSpacing: true
+                });
+            } else {
+                await renderChatMessage(response, {
+                    prefix: '🤖 Gemini:',
+                    showTimestamp: false,
+                    addSpacing: true
+                });
+            }
 
         } catch (err) {
             process.stdout.clearLine();
@@ -273,11 +297,18 @@ async function quickTest() {
         
         const response = await generateContent(model, testPrompt);
         
-        // Test the new markdown renderer
-        await renderChatMessage(response, {
-          prefix: '📝 Test Response:',
-          showTimestamp: true
-        });
+        // Test the markdown renderer or original response based on setting
+        if (preserveOriginalResponse) {
+            await renderOriginalResponse(response, {
+                prefix: '📝 Test Response:',
+                showTimestamp: true
+            });
+        } else {
+            await renderChatMessage(response, {
+                prefix: '📝 Test Response:',
+                showTimestamp: true
+            });
+        }
         
         console.log('\n🎉 Quick test completed successfully!');
         console.log('💡 Run "npm start" to start the interactive chatbot\n');

@@ -45,8 +45,17 @@ export async function renderMarkdownContent(content, options = {}) {
   const { 
     showBorder = false, 
     theme = 'default',
-    width = process.stdout.columns || 80
+    width = process.stdout.columns || 80,
+    preserveOriginal = false
   } = options;
+
+  if (!content) return;
+
+  // If preserveOriginal is true, output content as-is without any transformations
+  if (preserveOriginal) {
+    console.log(content);
+    return;
+  }
 
   // Try to use ink-markdown first
   const inkAvailable = await initializeInkMarkdown();
@@ -76,7 +85,7 @@ export async function renderMarkdownContent(content, options = {}) {
   }
   
   // Fallback to simple renderer
-  renderMarkdownSimple(content);
+  renderMarkdownSimple(content, options);
 }
 
 /**
@@ -88,7 +97,8 @@ export async function renderChatMessage(content, options = {}) {
   const {
     prefix = '🤖 AI:',
     showTimestamp = false,
-    addSpacing = true
+    addSpacing = true,
+    preserveOriginal = false
   } = options;
 
   // Add timestamp if requested
@@ -102,8 +112,12 @@ export async function renderChatMessage(content, options = {}) {
     console.log(chalk.green.bold(prefix));
   }
 
-  // Render the markdown content
-  await renderMarkdownContent(content, options);
+  // Render the content - preserve original if requested
+  if (preserveOriginal) {
+    console.log(content);
+  } else {
+    await renderMarkdownContent(content, options);
+  }
 
   // Add spacing
   if (addSpacing) {
@@ -156,9 +170,18 @@ export async function renderHelpContent(commands) {
 /**
  * Fallback simple markdown renderer (for compatibility)
  * @param {string} content - Markdown content
+ * @param {Object} options - Rendering options
  */
-export function renderMarkdownSimple(content) {
+export function renderMarkdownSimple(content, options = {}) {
   if (!content) return;
+  
+  const { preserveOriginal = false } = options;
+  
+  // If preserveOriginal is true, just output the content as-is without any transformations
+  if (preserveOriginal) {
+    console.log(content);
+    return;
+  }
   
   let output = content
     // Bold **text** or __text__
@@ -186,7 +209,13 @@ export function renderMarkdownSimple(content) {
  * @param {Object} options - Rendering options
  */
 export async function smartRender(content, options = {}) {
-  const { forceSimple = false } = options;
+  const { forceSimple = false, preserveOriginal = false } = options;
+  
+  // If preserveOriginal is true, output content as-is without any transformations
+  if (preserveOriginal) {
+    console.log(content);
+    return;
+  }
   
   // Check if content has complex markdown that benefits from ink-markdown
   const hasComplexMarkdown = content.includes('```') || 
@@ -200,9 +229,42 @@ export async function smartRender(content, options = {}) {
       await renderMarkdownContent(content, options);
     } catch (error) {
       console.warn(chalk.yellow('⚠️ Falling back to simple renderer'));
-      renderMarkdownSimple(content);
+      renderMarkdownSimple(content, options);
     }
   } else {
-    renderMarkdownSimple(content);
+    renderMarkdownSimple(content, options);
+  }
+}
+
+/**
+ * Render AI response without any markdown transformations
+ * Use this when you want to preserve the exact original AI response
+ * @param {string} content - The AI response content
+ * @param {Object} options - Rendering options
+ */
+export async function renderOriginalResponse(content, options = {}) {
+  const {
+    prefix = '🤖 AI:',
+    showTimestamp = false,
+    addSpacing = true
+  } = options;
+
+  // Add timestamp if requested
+  if (showTimestamp) {
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(chalk.gray(`[${timestamp}]`));
+  }
+
+  // Show prefix
+  if (prefix) {
+    console.log(chalk.green.bold(prefix));
+  }
+
+  // Output the original content without any transformations
+  console.log(content);
+
+  // Add spacing
+  if (addSpacing) {
+    console.log();
   }
 }
