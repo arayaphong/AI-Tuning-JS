@@ -129,7 +129,7 @@ The AI automatically detects these keywords and executes system commands:
 - **CPU**: `cpu`, `processor` → Shows CPU information  
 - **System**: `system` → Shows system information
 - **Files**: `list files`, `directory` → Lists files
-- **Git**: `git status`, `git log` → Git operations
+- **Commands**: `run <command>`, `execute <command>` → Execute safe commands
 
 ## Markdown Renderer API
 
@@ -214,9 +214,13 @@ const options = {
 ```
 src/
 ├── utils/
-│   ├── markdown-renderer.js    # Enhanced markdown rendering
-│   ├── google-ai-integration.js # AI and shell commands
-│   └── data-utils.js           # Data processing utilities
+│   ├── ui-renderer.js          # Enhanced UI rendering and markdown
+│   ├── google-ai-integration.js # AI integration
+│   ├── shell-commands.js       # Shell command implementations
+│   ├── shell-processor.js      # Shell command detection and processing
+│   ├── command-handlers.js     # CLI command handlers
+│   ├── session-manager.js      # Session management
+│   └── display-utils.js        # Display utilities
 examples/
 └── basic-google-ai.js          # Basic AI examples
 ```

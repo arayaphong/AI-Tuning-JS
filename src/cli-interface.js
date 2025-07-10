@@ -5,7 +5,8 @@
 
 import readline from 'readline';
 import chalk from 'chalk';
-import { initializeGoogleAI, generateContent, listShellCommands } from './utils/google-ai-integration.js';
+import { initializeGoogleAI, generateContent } from './utils/google-ai-integration.js';
+import { listShellCommands } from './utils/shell-commands.js';
 import { SessionManager } from './utils/session-manager.js';
 import { handleSpecialCommands } from './utils/command-handlers.js';
 import { renderChatMessage, showBanner } from './utils/ui-renderer.js';
@@ -112,7 +113,7 @@ export async function startChatbot(config = {}) {
       } else if (err.message.includes('not found')) {
         console.log(chalk.yellow('💡 Tip: Command might not be available on your system'));
       } else if (err.message.includes('function')) {
-        console.log(chalk.yellow('💡 Tip: Try using simpler language with keywords like "memory", "files", "git status"'));
+        console.log(chalk.yellow('💡 Tip: Try using simpler language with keywords like "memory", "files", "cpu"'));
       }
     }
 

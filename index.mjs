@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
-import { initializeGoogleAI, generateContent, listShellCommands } from './src/utils/google-ai-integration.js';
+import { initializeGoogleAI, generateContent } from './src/utils/google-ai-integration.js';
+import { listShellCommands } from './src/utils/shell-commands.js';
 import { 
   renderChatMessage, 
   renderHelpContent, 
   renderSystemInfo,
   smartRender 
-} from './src/utils/markdown-renderer.js';
+} from './src/utils/ui-renderer.js';
 import { SessionManager } from './src/utils/session-manager.js';
 
 import dotenv from 'dotenv';
@@ -135,7 +136,8 @@ async function handleSpecialCommands(input, rl) {
         sessionManager.setAutoSave(false);
       } else {
         console.log(chalk.yellow('💡 Usage: /autosave on|off'));
-        console.log(chalk.gray('Current status: ' + (sessionManager.autoSaveEnabled ? 'enabled' : 'disabled')));
+        const sessionInfo = sessionManager.getSessionInfo();
+        console.log(chalk.gray('Current status: ' + (sessionInfo.autoSaveOnExit ? 'enabled' : 'disabled')));
       }
       return true;
 
@@ -233,7 +235,7 @@ async function handleSpecialCommands(input, rl) {
       await renderHelpContent(helpCommands);
       
       console.log(chalk.yellow('💡 **Natural Language Usage:**'));
-      console.log('Just type naturally! Keywords like "memory", "cpu", "files", "git status" will automatically trigger shell commands.\n');
+      console.log('Just type naturally! Keywords like "memory", "cpu", "files" will automatically trigger shell commands.\n');
       console.log(chalk.yellow('💾 **Session Management:**'));
       console.log('Save conversations with /save, load them with /load, and manage with /sessions.\n');
       return true;
@@ -249,11 +251,6 @@ async function handleSpecialCommands(input, rl) {
 ## File Operations
 - "List files in my current directory"
 - "Show me the files in this folder"
-
-## Git Operations
-- "What's my git status?"
-- "Show me recent git commits"
-- "What git branch am I on?"
 
 ## Command Execution
 - "Run pwd"
@@ -277,7 +274,6 @@ async function handleSpecialCommands(input, rl) {
 
 ## Combined Requests
 - "Show my memory usage and list files"
-- "What's my git status and system info?"
 
 *Keywords are automatically detected and trigger shell commands!*
 *Sessions are automatically tracked and can be saved/loaded anytime!*`;
@@ -288,8 +284,8 @@ async function handleSpecialCommands(input, rl) {
     case '/exit':
     case '/quit':
     case 'exit':
-      // Auto-save current session if active
-      await sessionManager.autoSave();
+      // Auto-save current session if enabled
+      await sessionManager.saveOnExit();
       console.log(chalk.green('👋 Goodbye!'));
       rl.close();
       process.exit(0);
@@ -530,7 +526,7 @@ async function startChatbot() {
             } else if (err.message.includes('not found')) {
                 console.log(chalk.yellow('💡 Tip: Command might not be available on your system'));
             } else if (err.message.includes('function')) {
-                console.log(chalk.yellow('💡 Tip: Try using simpler language with keywords like "memory", "files", "git status"'));
+                console.log(chalk.yellow('💡 Tip: Try using simpler language with keywords like "memory", "files"'));
             }
         }
 
@@ -539,8 +535,8 @@ async function startChatbot() {
     });
 
     rl.on('close', async () => {
-        // Auto-save current session if active
-        await sessionManager.autoSave();
+        // Auto-save current session if enabled
+        await sessionManager.saveOnExit();
         console.log(chalk.green('\n👋 Chat ended.'));
         process.exit(0);
     });
@@ -548,7 +544,7 @@ async function startChatbot() {
     // Handle Ctrl+C gracefully
     process.on('SIGINT', async () => {
         console.log(chalk.yellow('\n🔄 Saving current session...'));
-        await sessionManager.autoSave();
+        await sessionManager.saveOnExit();
         console.log(chalk.green('👋 Goodbye!'));
         rl.close();
     });

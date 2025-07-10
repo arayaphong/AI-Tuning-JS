@@ -68,7 +68,7 @@ export async function smartRender(content) {
     // Handle inline code `code`
     else if (trimmedLine.includes('`')) {
       const processed = trimmedLine.replace(/`(.*?)`/g, (match, code) => {
-        return chalk.cyan.bg.gray(` ${code} `);
+        return chalk.cyan.bgBlack(` ${code} `);
       });
       console.log(processed);
     }

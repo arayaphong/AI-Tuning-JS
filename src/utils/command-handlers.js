@@ -4,7 +4,7 @@
  */
 
 import chalk from 'chalk';
-import { listShellCommands } from './google-ai-integration.js';
+import { listShellCommands } from './shell-commands.js';
 import { renderSystemInfo, renderHelpContent, smartRender } from './ui-renderer.js';
 import { 
   displaySessionInfo, 
@@ -275,7 +275,7 @@ async function showHelpContent() {
   await renderHelpContent(helpCommands);
   
   console.log(chalk.yellow('💡 **Natural Language Usage:**'));
-  console.log('Just type naturally! Keywords like "memory", "cpu", "files", "git status" will automatically trigger shell commands.\n');
+  console.log('Just type naturally! Keywords like "memory", "cpu", "files", "system" will automatically trigger shell commands.\n');
   console.log(chalk.yellow('💾 **Session Management:**'));
   console.log('Save conversations with /save, load them with /load, and manage with /sessions.\n');
 }
@@ -294,11 +294,6 @@ async function showExampleContent() {
 ## File Operations
 - "List files in my current directory"
 - "Show me the files in this folder"
-
-## Git Operations
-- "What's my git status?"
-- "Show me recent git commits"
-- "What git branch am I on?"
 
 ## Command Execution
 - "Run pwd"
@@ -329,7 +324,7 @@ When \`/autosave on\` is enabled:
 
 ## Combined Requests
 - "Show my memory usage and list files"
-- "What's my git status and system info?"
+- "What's my system info and memory usage?"
 
 *Keywords are automatically detected and trigger shell commands!*
 *Sessions are automatically tracked and can be saved/loaded anytime!*`;
