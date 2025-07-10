@@ -251,24 +251,58 @@ export async function initializeGoogleAI(config = {}) {
 }
 
 /**
- * Generate content with shell command detection - RELIABLE VERSION
+ * Generate content with shell command detection and conversation context - RELIABLE VERSION
  */
 export async function generateContent(model, prompt, options = {}) {
   if (!model || !prompt) {
     throw new Error('Model and prompt are required');
   }
 
+  const { conversationHistory = [] } = options;
+
   try {
     // Execute shell commands first
     const shellResults = await processShellCommands(prompt);
     
-    // Build enhanced prompt
-    let enhancedPrompt = prompt;
-    if (shellResults.length > 0) {
-      enhancedPrompt += '\n\n--- SYSTEM DATA ---\n' + shellResults.join('\n\n') + 
-                       '\n--- END SYSTEM DATA ---\n\n' +
-                       'Please provide a helpful response about the user question using the system data above.';
+    // Build conversation context
+    let contextPrompt = '';
+    
+    // Add conversation history for context (last 10 messages to avoid token limits)
+    if (conversationHistory && conversationHistory.length > 0) {
+      const recentHistory = conversationHistory.slice(-10);
+      contextPrompt += '\n--- CONVERSATION HISTORY ---\n';
+      recentHistory.forEach((message, index) => {
+        const role = message.role === 'user' ? 'User' : 'Assistant';
+        contextPrompt += `${role}: ${message.content}\n\n`;
+      });
+      contextPrompt += '--- END CONVERSATION HISTORY ---\n\n';
     }
+    
+    // Build enhanced prompt with context and current message
+    let enhancedPrompt = '';
+    
+    // Add conversation context if available
+    if (contextPrompt) {
+      enhancedPrompt += contextPrompt;
+    }
+    
+    // Add current user message
+    enhancedPrompt += `Current User Message: ${prompt}\n\n`;
+    
+    // Add shell command results if any
+    if (shellResults.length > 0) {
+      enhancedPrompt += '--- SYSTEM DATA ---\n' + shellResults.join('\n\n') + 
+                       '\n--- END SYSTEM DATA ---\n\n';
+    }
+    
+    // Add instructions for the AI
+    enhancedPrompt += `Please respond to the current user message. Use the conversation history to remember previous information about the user (name, location, preferences, etc.). If system data is provided, incorporate it naturally into your response.
+
+Important: 
+- Remember information from previous messages in the conversation
+- If the user asks about something mentioned earlier (like their name or location), refer back to that information
+- Be conversational and natural
+- Use the system data to answer technical questions when relevant`;
     
     // Simple generate content call - NO FUNCTION CALLING
     const result = await model.generateContent(enhancedPrompt);

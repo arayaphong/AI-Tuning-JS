@@ -1,14 +1,29 @@
-# AI-Tuning-JS with ink-markdown Integration
+# AI-Tuning-JS with Enhanced Markdown Rendering
 
-A Node.js AI chatbot with enhanced markdown rendering for beautiful chat output.
+A Node.js AI chatbot with beautiful built-in markdown rendering for exceptional chat output.
 
 ## Features
 
-### 🎨 Enhanced Markdown Rendering
+### 🧠 Conversation Memory
+- **Remembers information** from previous messages in the conversation
+- **Personal details recall** (name, location, preferences)
+- **Context-aware responses** based on conversation history
+- **Cross-session continuity** with save/load functionality
+
+### 💾 Advanced Session Management
+- **Save/load conversations** with meaningful names
+- **Search through history** with powerful filters
+- **Export conversations** in multiple formats (JSON, Markdown, CSV, TXT)
+- **Automatic backups** and data protection
+- **Analytics and insights** about conversation patterns
+
+### 🎨 Enhanced Built-in Markdown Rendering
 - **Rich text formatting** with bold, italic, and inline code
-- **Syntax-highlighted code blocks** 
-- **Structured headers** and lists
-- **Smart fallback rendering** when ink-markdown is unavailable
+- **Syntax-highlighted code blocks** with language indicators
+- **Beautiful table rendering** with borders and proper alignment
+- **Task lists** with checkboxes (✅ completed, ☐ pending)
+- **Structured headers** and numbered/bulleted lists
+- **Reliable cross-platform rendering** without external dependencies
 - **Beautiful terminal output** with proper spacing and colors
 
 ### 🤖 AI-Powered Chat
@@ -34,9 +49,25 @@ node index.mjs
 
 ### Test the System
 ```bash
-npm test
-# or
-node index.mjs --test
+npm test                 # Basic AI functionality test
+npm run memory-test      # Test conversation memory
+npm run history-demo     # Demo session management features
+```
+
+### Test Conversation Memory
+Try this scenario to see memory in action:
+```bash
+npm start
+
+# In the chat:
+You: My name is Arme from Bangkok, Thailand.
+AI: Hello Arme! Nice to meet you...
+
+You: What is my name?
+AI: Your name is Arme.
+
+You: Where am I from?  
+AI: You're from Bangkok, Thailand.
 ```
 
 ## Markdown Rendering Examples
@@ -147,11 +178,11 @@ await renderHelpContent(commandArray);
 
 ### Fallback Behavior
 
-The system includes intelligent fallback:
+The system uses a powerful built-in renderer:
 
-1. **Primary**: Attempts to use `ink-markdown` for rich rendering
-2. **Fallback**: Uses enhanced chalk-based renderer
-3. **Safety**: Falls back to plain text if needed
+1. **Primary**: Enhanced chalk-based renderer with full markdown support
+2. **Reliable**: No external dependencies or compatibility issues
+3. **Feature-rich**: Tables, checkboxes, code blocks, and beautiful formatting
 
 ### Configuration
 
@@ -199,30 +230,17 @@ examples/
 - Console logging with emojis for UX
 
 ### Key Dependencies
-- `ink-markdown` - Rich terminal markdown rendering
-- `ink` - React-based terminal UI components  
-- `chalk` - Terminal string styling
+- `chalk` - Terminal string styling for beautiful output
 - `@google/generative-ai` - Google AI SDK
 - `systeminformation` - System data collection
 
 ## Troubleshooting
 
-### ink-markdown Not Working
-If you see "⚠️ ink-markdown not available", the system automatically falls back to the enhanced chalk renderer. This can happen due to:
-- ESM compatibility issues
-- Missing dependencies
-- Terminal compatibility
-
-The fallback renderer still provides excellent formatting with:
-- **Bold** and *italic* text
-- `Highlighted code`
-- Structured headers
-- Proper spacing and colors
-
 ### Performance
 - Rendering is optimized for real-time chat
-- Automatic cleanup prevents memory leaks
+- Built-in renderer ensures consistent cross-platform experience
 - Smart detection avoids unnecessary processing
+- No external dependencies means faster startup and fewer compatibility issues
 
 ## Examples
 

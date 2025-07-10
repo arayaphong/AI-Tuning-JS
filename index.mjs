@@ -7,6 +7,7 @@ import {
   renderSystemInfo,
   smartRender 
 } from './src/utils/markdown-renderer.js';
+import { SessionManager } from './src/utils/session-manager.js';
 
 import dotenv from 'dotenv';
 import readline from 'readline';
@@ -14,13 +15,130 @@ import chalk from 'chalk';
 
 dotenv.config();
 
+// Global session manager instance
+let sessionManager;
+
 /**
- * Handle special CLI commands
+ * Handle special CLI commands including session management
  */
 async function handleSpecialCommands(input, rl) {
   const command = input.toLowerCase().trim();
+  const parts = input.trim().split(' ');
+  const baseCommand = parts[0].toLowerCase();
   
-  switch (command) {
+  switch (baseCommand) {
+    case '/save':
+      if (parts.length < 2) {
+        console.log(chalk.red('❌ Usage: /save <session_name>'));
+        console.log(chalk.gray('Example: /save my_conversation'));
+        return true;
+      }
+      const saveSessionName = parts.slice(1).join(' ');
+      await sessionManager.saveSession(saveSessionName);
+      return true;
+
+    case '/load':
+      if (parts.length < 2) {
+        console.log(chalk.red('❌ Usage: /load <session_name>'));
+        console.log(chalk.gray('Example: /load my_conversation'));
+        return true;
+      }
+      const loadSessionName = parts.slice(1).join(' ');
+      const loaded = await sessionManager.loadSession(loadSessionName);
+      if (loaded) {
+        // Display conversation history
+        await displayConversationHistory();
+      }
+      return true;
+
+    case '/sessions':
+    case '/list':
+      await sessionManager.listAvailableSessions();
+      return true;
+
+    case '/delete':
+      if (parts.length < 2) {
+        console.log(chalk.red('❌ Usage: /delete <session_name>'));
+        console.log(chalk.gray('Example: /delete my_conversation'));
+        return true;
+      }
+      const deleteSessionName = parts.slice(1).join(' ');
+      await sessionManager.deleteSession(deleteSessionName);
+      return true;
+
+    case '/new':
+    case '/clear':
+      if (command === '/clear') {
+        console.clear();
+        console.log(chalk.green('🤖 Gemini AI Chatbot with Shell Commands\n'));
+      }
+      sessionManager.clearSession();
+      return true;
+
+    case '/info':
+    case '/status':
+      await displaySessionInfo();
+      return true;
+
+    case '/history':
+      await displayConversationHistory();
+      return true;
+
+    case '/search':
+      if (parts.length < 2) {
+        console.log(chalk.red('❌ Usage: /search <query> [options]'));
+        console.log(chalk.gray('Example: /search "error message"'));
+        console.log(chalk.gray('Options: --user, --assistant, --from=date, --to=date'));
+        return true;
+      }
+      const searchQuery = parts.slice(1).join(' ').replace(/--\w+[=\w-]*/g, '').trim();
+      const searchOptions = {};
+      
+      // Parse search options
+      if (input.includes('--user')) searchOptions.role = 'user';
+      if (input.includes('--assistant')) searchOptions.role = 'assistant';
+      
+      const results = sessionManager.searchHistory(searchQuery, searchOptions);
+      await displaySearchResults(results, searchQuery);
+      return true;
+
+    case '/export':
+      const format = parts[1] || 'json';
+      const fileName = parts[2] || null;
+      
+      if (!['json', 'markdown', 'txt', 'csv'].includes(format.toLowerCase())) {
+        console.log(chalk.red('❌ Invalid format. Supported: json, markdown, txt, csv'));
+        return true;
+      }
+      
+      try {
+        await sessionManager.exportConversation(format, fileName);
+      } catch (error) {
+        console.log(chalk.red(`❌ Export failed: ${error.message}`));
+      }
+      return true;
+
+    case '/analytics':
+    case '/stats':
+      await displayAnalytics();
+      return true;
+
+    case '/backup':
+      await sessionManager.createBackup();
+      return true;
+
+    case '/autosave':
+      const action = parts[1]?.toLowerCase();
+      if (action === 'on' || action === 'enable') {
+        sessionManager.setAutoSave(true);
+      } else if (action === 'off' || action === 'disable') {
+        sessionManager.setAutoSave(false);
+      } else {
+        console.log(chalk.yellow('💡 Usage: /autosave on|off'));
+        console.log(chalk.gray('Current status: ' + (sessionManager.autoSaveEnabled ? 'enabled' : 'disabled')));
+      }
+      return true;
+
     case '/commands':
     case '/tools':
       await renderSystemInfo('Available Shell Commands', 'These keywords trigger shell commands when mentioned in your messages:');
@@ -29,6 +147,61 @@ async function handleSpecialCommands(input, rl) {
       
     case '/help':
       const helpCommands = [
+        {
+          name: '/save <name>',
+          description: 'Save current conversation to a session file',
+          examples: ['/save my_conversation', '/save project_chat']
+        },
+        {
+          name: '/load <name>',
+          description: 'Load a saved conversation session',
+          examples: ['/load my_conversation', '/load project_chat']
+        },
+        {
+          name: '/sessions',
+          description: 'List all available saved sessions',
+          examples: ['/sessions', '/list']
+        },
+        {
+          name: '/delete <name>',
+          description: 'Delete a saved session file',
+          examples: ['/delete old_conversation']
+        },
+        {
+          name: '/new',
+          description: 'Start a new conversation (clear current session)',
+          examples: ['/new', '/clear']
+        },
+        {
+          name: '/info',
+          description: 'Show current session information and status',
+          examples: ['/info', '/status']
+        },
+        {
+          name: '/search <q>',
+          description: 'Search through conversation history',
+          examples: ['/search "error message"', '/search api --user']
+        },
+        {
+          name: '/export <format>',
+          description: 'Export conversation (json, markdown, txt, csv)',
+          examples: ['/export markdown', '/export json my_chat']
+        },
+        {
+          name: '/analytics',
+          description: 'Show conversation statistics and analytics',
+          examples: ['/analytics', '/stats']
+        },
+        {
+          name: '/backup',
+          description: 'Create a backup of current conversation',
+          examples: ['/backup']
+        },
+        {
+          name: '/autosave <on|off>',
+          description: 'Enable or disable automatic saving',
+          examples: ['/autosave on', '/autosave off']
+        },
         {
           name: '/commands',
           description: 'List all available shell command keywords',
@@ -41,7 +214,7 @@ async function handleSpecialCommands(input, rl) {
         },
         {
           name: '/clear',
-          description: 'Clear the terminal screen',
+          description: 'Clear the terminal screen and start new session',
           examples: ['/clear']
         },
         {
@@ -56,11 +229,13 @@ async function handleSpecialCommands(input, rl) {
         }
       ];
       
-      console.log(chalk.cyan.bold('🤖 Gemini AI Chatbot with Shell Commands\n'));
+      console.log(chalk.cyan.bold('🤖 Gemini AI Chatbot with Shell Commands & Sessions\n'));
       await renderHelpContent(helpCommands);
       
       console.log(chalk.yellow('💡 **Natural Language Usage:**'));
       console.log('Just type naturally! Keywords like "memory", "cpu", "files", "git status" will automatically trigger shell commands.\n');
+      console.log(chalk.yellow('💾 **Session Management:**'));
+      console.log('Save conversations with /save, load them with /load, and manage with /sessions.\n');
       return true;
       
     case '/examples':
@@ -85,22 +260,36 @@ async function handleSpecialCommands(input, rl) {
 - "Execute date"
 - "Run ps aux"
 
+## Session Management & History
+- "/save important_meeting" - Save current conversation
+- "/load important_meeting" - Load a saved conversation
+- "/sessions" - List all saved sessions
+- "/info" - Show current session status
+- "/autosave on" - Enable automatic saving
+- "/backup" - Create conversation backup
+
+## Search & Analysis
+- "/search error" - Search conversation history
+- "/search api --user" - Search only user messages
+- "/analytics" - View conversation statistics
+- "/export markdown" - Export to markdown file
+- "/export json my_chat" - Export with custom name
+
 ## Combined Requests
 - "Show my memory usage and list files"
 - "What's my git status and system info?"
 
-*Keywords are automatically detected and trigger shell commands!*`;
+*Keywords are automatically detected and trigger shell commands!*
+*Sessions are automatically tracked and can be saved/loaded anytime!*`;
       
       await smartRender(exampleContent);
       return true;
       
-    case '/clear':
-      console.clear();
-      console.log(chalk.green('🤖 Gemini AI Chatbot with Shell Commands\n'));
-      return true;
-      
     case '/exit':
+    case '/quit':
     case 'exit':
+      // Auto-save current session if active
+      await sessionManager.autoSave();
       console.log(chalk.green('👋 Goodbye!'));
       rl.close();
       process.exit(0);
@@ -112,20 +301,152 @@ async function handleSpecialCommands(input, rl) {
 }
 
 /**
- * Display startup banner
+ * Display current session information
  */
-function showBanner() {
-  console.log(chalk.green.bold('🤖 Gemini AI Chatbot with Shell Commands'));
-  console.log(chalk.gray('═'.repeat(55)));
-  console.log(chalk.yellow('💡 Use natural language - keywords trigger shell commands!'));
-  console.log(chalk.gray('Type /help for commands or just start chatting!\n'));
+async function displaySessionInfo() {
+  const info = sessionManager.getSessionInfo();
+  
+  console.log(chalk.cyan.bold('\n📊 Session Information'));
+  console.log(chalk.gray('─'.repeat(30)));
+  
+  if (info.currentSessionName) {
+    console.log(chalk.white(`💾 Current Session: ${info.currentSessionName}`));
+  } else {
+    console.log(chalk.yellow('💾 Current Session: Unsaved'));
+  }
+  
+  console.log(chalk.white(`💬 Messages: ${info.messageCount}`));
+  console.log(chalk.gray(`📅 Created: ${new Date(info.metadata.createdAt).toLocaleString()}`));
+  console.log(chalk.gray(`🕒 Last Modified: ${new Date(info.metadata.lastModified).toLocaleString()}`));
+  
+  if (info.hasUnsavedChanges) {
+    console.log(chalk.yellow('⚠️  Unsaved changes - use /save <name> to save'));
+  }
+  
+  console.log();
 }
 
 /**
- * Starts the reliable chatbot with keyword-based shell commands
+ * Display conversation history
+ */
+async function displayConversationHistory() {
+  const history = sessionManager.getConversationHistory();
+  
+  if (history.length === 0) {
+    console.log(chalk.yellow('📝 No conversation history in current session.'));
+    return;
+  }
+  
+  console.log(chalk.cyan.bold('\n📜 Conversation History'));
+  console.log(chalk.gray('═'.repeat(50)));
+  
+  for (let i = 0; i < history.length; i++) {
+    const message = history[i];
+    const timestamp = new Date(message.timestamp).toLocaleTimeString();
+    
+    if (message.role === 'user') {
+      console.log(chalk.blue.bold(`\n[${timestamp}] 💬 You:`));
+      console.log(chalk.white(message.content));
+    } else {
+      console.log(chalk.green.bold(`\n[${timestamp}] 🤖 AI:`));
+      // Use simple rendering for history to avoid formatting issues
+      console.log(chalk.white(message.content.substring(0, 200) + (message.content.length > 200 ? '...' : '')));
+    }
+  }
+  
+  console.log(chalk.gray('\n' + '═'.repeat(50)));
+  console.log(chalk.gray(`Total messages: ${history.length}`));
+  console.log();
+}
+
+/**
+ * Display search results
+ */
+async function displaySearchResults(results, query) {
+  if (results.length === 0) {
+    console.log(chalk.yellow(`🔍 No results found for "${query}"`));
+    return;
+  }
+
+  console.log(chalk.cyan.bold(`\n🔍 Search Results for "${query}"`));
+  console.log(chalk.gray('═'.repeat(50)));
+  console.log(chalk.gray(`Found ${results.length} matching message(s)\n`));
+
+  for (let i = 0; i < results.length; i++) {
+    const message = results[i];
+    const timestamp = new Date(message.timestamp).toLocaleString();
+    const roleIcon = message.role === 'user' ? '💬' : '🤖';
+    const roleColor = message.role === 'user' ? chalk.blue : chalk.green;
+    
+    console.log(roleColor.bold(`${roleIcon} ${message.role.toUpperCase()} [${timestamp}]:`));
+    
+    // Highlight search term in context
+    const content = message.content.length > 200 ? 
+      message.content.substring(0, 200) + '...' : message.content;
+    
+    console.log(chalk.white(content));
+    console.log(chalk.gray('─'.repeat(30)));
+  }
+  console.log();
+}
+
+/**
+ * Display conversation analytics
+ */
+async function displayAnalytics() {
+  const analytics = sessionManager.getAnalytics();
+  
+  console.log(chalk.cyan.bold('\n📊 Conversation Analytics'));
+  console.log(chalk.gray('═'.repeat(40)));
+  
+  console.log(chalk.white(`💬 Total Messages: ${analytics.totalMessages}`));
+  console.log(chalk.blue(`👤 User Messages: ${analytics.userMessages}`));
+  console.log(chalk.green(`🤖 AI Messages: ${analytics.assistantMessages}`));
+  
+  if (analytics.conversationDuration > 0) {
+    const duration = Math.round(analytics.conversationDuration / 60000);
+    console.log(chalk.yellow(`⏱️  Duration: ${duration} minutes`));
+  }
+  
+  console.log(chalk.magenta(`📏 Avg Message Length: ${analytics.averageMessageLength} chars`));
+  console.log(chalk.cyan(`🕐 Most Active Hour: ${analytics.mostActiveHour}:00`));
+  
+  console.log(chalk.gray(`📅 Created: ${new Date(analytics.createdAt).toLocaleString()}`));
+  console.log(chalk.gray(`🕒 Last Modified: ${new Date(analytics.lastModified).toLocaleString()}`));
+  
+  // Message distribution
+  if (analytics.totalMessages > 0) {
+    const userRatio = Math.round((analytics.userMessages / analytics.totalMessages) * 100);
+    const aiRatio = 100 - userRatio;
+    console.log(chalk.gray(`📊 Distribution: ${userRatio}% User, ${aiRatio}% AI`));
+  }
+  
+  console.log();
+}
+
+/**
+ * Display startup banner
+ */
+function showBanner() {
+  console.log(chalk.green.bold('🤖 Gemini AI Chatbot with Shell Commands & Sessions'));
+  console.log(chalk.gray('═'.repeat(65)));
+  console.log(chalk.yellow('💡 Use natural language - keywords trigger shell commands!'));
+  console.log(chalk.yellow('💾 Save/load conversations with /save and /load commands!'));
+  console.log(chalk.gray('Type /help for all commands or just start chatting!\n'));
+}
+
+/**
+ * Starts the reliable chatbot with keyword-based shell commands and session management
  */
 async function startChatbot() {
     showBanner();
+
+    // Initialize session manager
+    sessionManager = new SessionManager();
+    await sessionManager.initialize();
+    
+    // Enable auto-save by default for better user experience
+    sessionManager.setAutoSave(true);
 
     const { GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION, GOOGLE_AI_API_KEY } = process.env;
 
@@ -150,6 +471,8 @@ async function startChatbot() {
     // Show available shell command keywords on startup
     console.log(chalk.cyan('Available shell command keywords:'));
     listShellCommands();
+    console.log(chalk.cyan('\nSession commands: /save, /load, /search, /export, /analytics'));
+    console.log(chalk.cyan('History features: Auto-save, backup, search, export to multiple formats'));
     console.log(chalk.gray('\nJust ask naturally - keywords will trigger shell commands!\n'));
     rl.prompt();
 
@@ -167,16 +490,27 @@ async function startChatbot() {
             return;
         }
 
+        // Add user message to session
+        sessionManager.addMessage('user', input);
+
         try {
             // Show processing indicator
             const processingText = chalk.yellow('🤔 Processing...');
             process.stdout.write(processingText + '\r');
 
-            const response = await generateContent(model, input);
+            // Get conversation history for context
+            const conversationHistory = sessionManager.getConversationHistory();
+
+            const response = await generateContent(model, input, {
+                conversationHistory: conversationHistory
+            });
 
             // Clear processing indicator
             process.stdout.clearLine();
             process.stdout.cursorTo(0);
+
+            // Add AI response to session
+            sessionManager.addMessage('assistant', response);
 
             // Display response using ink-markdown for rich markdown rendering
             await renderChatMessage(response, {
@@ -204,14 +538,18 @@ async function startChatbot() {
         rl.prompt();
     });
 
-    rl.on('close', () => {
+    rl.on('close', async () => {
+        // Auto-save current session if active
+        await sessionManager.autoSave();
         console.log(chalk.green('\n👋 Chat ended.'));
         process.exit(0);
     });
 
     // Handle Ctrl+C gracefully
-    process.on('SIGINT', () => {
-        console.log(chalk.green('\n👋 Goodbye!'));
+    process.on('SIGINT', async () => {
+        console.log(chalk.yellow('\n🔄 Saving current session...'));
+        await sessionManager.autoSave();
+        console.log(chalk.green('👋 Goodbye!'));
         rl.close();
     });
 
