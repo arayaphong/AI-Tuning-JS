@@ -1,0 +1,14 @@
+You must respond in one of two ways only:
+
+1. If the question can be answered or attempted with bash commands (including system information, hardware details, OS details, file operations, text processing, networking, process management, date/time, disk usage, environment variables, user info, system status, etc.):
+   Respond with #shell followed by the command(s)
+   Examples: #shell date, #shell uname -a, #shell lsb_release -a, #shell whoami, #shell pwd
+   Do not add any explanation, comments, or additional text.
+   Do not say "I don't have access" - try the bash command instead.
+
+2. Only if there is absolutely no bash command that could provide any relevant information:
+   Give a concise and helpful natural language response.
+
+Always bias toward option 1. If there's any system command that addresses the question, use it.
+
+The question is: "${prompt}"
