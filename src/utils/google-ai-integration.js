@@ -1,8 +1,6 @@
-import { VertexAI } from '@google-cloud/vertexai';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { processShellCommands } from './shell-processor.js';
-import { listShellCommands } from './shell-commands.js';
 import fs from 'fs';
+import Model from './google-ai-model.js';
+import { processShellCommands } from './shell-processor.js';
 
 /**
  * RELIABLE SHELL COMMAND SYSTEM - NO FUNCTION CALLING
@@ -14,32 +12,8 @@ import fs from 'fs';
  * Initialize Google AI - SIMPLE VERSION (NO TOOLS)
  */
 export async function initializeGoogleAI(config = {}) {
-  const {
-    project,
-    location = 'us-central1',
-    apiKey,
-    vertexModel = 'gemini-2.0-flash-exp',
-    apiKeyModel = 'gemini-pro'
-  } = config;
-
-  if (!project && !apiKey) {
-    throw new Error('No authentication found. Set project or apiKey');
-  }
-
-  let model;
-  if (project) {
-    const vertexAI = new VertexAI({ project, location });
-    // SIMPLE MODEL - NO TOOLS
-    model = vertexAI.getGenerativeModel({ model: vertexModel });
-    console.log('✅ Using Vertex AI with reliable shell commands');
-  } else if (apiKey) {
-    const client = new GoogleGenerativeAI(apiKey);
-    // SIMPLE MODEL - NO TOOLS  
-    model = client.getGenerativeModel({ model: apiKeyModel });
-    console.log('✅ Using API key with reliable shell commands');
-  }
-
-  return model;
+  // Import the Model class from @google/generative-ai
+  return new Model();
 }
 
 const generateShellCommand = async (model, conversationContext, prompt) => {
@@ -48,27 +22,15 @@ const generateShellCommand = async (model, conversationContext, prompt) => {
   // Load bash prompt template from external file
   const bashPrompt = fs.readFileSync('prompts/bash-prompt.txt', 'utf8');
   const bashCommandPrompt = bashPrompt.replace('${prompt}', prompt);
-  const response = await model.generateContent(bashCommandPrompt);
+  const responseText = await model.generateContent(bashCommandPrompt);
 
-  // Convert the model response to plain text ✅
-  const raw = response?.response ?? response; // Handle both SDK shapes
-  let commandText = '';
+  if (!responseText.includes('#shell')) return responseText;
 
-  if (raw?.candidates?.[0]?.content?.parts?.[0]?.text) {
-    // Vertex AI style
-    commandText = raw.candidates[0].content.parts[0].text;
-  } else if (raw?.text) {
-    // google-generative-ai style
-    commandText = typeof raw.text === 'function' ? await raw.text() : raw.text;
-  }
-
-  if (!commandText.includes('#shell')) return commandText;
-
-  const m = commandText.match(/```bash\n(.*?)\n```/s);
-  commandText = m ? m[1] : commandText;
+  const bashCommandMatch = responseText.match(/```bash\n(.*?)\n```/s);
+  responseText = bashCommandMatch ? bashCommandMatch[1] : responseText;
 
   // Sanitize: remove zero-width and other non-printable characters, then trim
-  const command = commandText
+  const command = responseText
     .replace(/[\x00-\x1F\x7F\u200B-\u200D\u2060\uFEFF]/g, '')
     .trim();
 
@@ -106,17 +68,17 @@ export async function generateContent(model, prompt, options = {}) {
     let googleAiResponses = [];
     if (!prompt.startsWith('#shell')) {
       const commandOutput = await generateShellCommand(model, conversationContext, prompt);
-      googleAiResponses = commandOutput.includes('#shell')
-        ? await processShellCommands(commandOutput)
-        : [];
-    } else {
-      const commands = extractBashCommands(prompt);
+      let commands = extractBashCommands(commandOutput);
       if (commands.length > 0) {
-        commands = commands.map(cmd => `#shell ${cmd}`).join('\n');
+        commands = commands.map(cmd => `#shell ${cmd}`);
+      } else {
+        commands = [];
       }
-      commands.forEach(async cmd => {
+      for (const cmd of commands) {
         googleAiResponses.push(await processShellCommands(cmd));
-      });
+      }
+    } else {
+      googleAiResponses.push(await processShellCommands(prompt));
     }
 
     // Build enhanced prompt with context and current message
@@ -137,28 +99,13 @@ export async function generateContent(model, prompt, options = {}) {
     }
 
     // Simple generate content call - NO FUNCTION CALLING
-    const result = await model.generateContent(enhancedPrompt);
-    const response = result.response;
-
-    // Handle response safely
-    if (response.text && typeof response.text === 'function') {
-      return response.text();
-    } else if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
-      return response.candidates[0].content.parts[0].text;
-    } else {
-      return 'Response generated but could not extract text';
-    }
+    return await model.generateContent(enhancedPrompt);
 
   } catch (error) {
     console.error('Error in generateContent:', error.message);
     throw error;
   }
 }
-
-/**
- * List available shell command keywords
- */
-export { listShellCommands };
 
 function retrieveRecentMessages(conversationHistory) {
   let contextPrompt = '';
@@ -177,23 +124,29 @@ function retrieveRecentMessages(conversationHistory) {
 }
 
 function extractBashCommands(text) {
-  // Regular expression to match bash code blocks
-  const bashCodeBlockRegex = /```bash\n([\s\S]*?)\n```/g;
   const commands = [];
-  let match;
 
-  // Find all bash code blocks
-  while ((match = bashCodeBlockRegex.exec(text)) !== null) {
-    // Extract the command content (group 1)
-    const commandContent = match[1].trim();
+  // Try both patterns: escaped backticks and regular backticks
+  const patterns = [
+    // Pattern 1: Regular backticks (```bash ... ```)
+    /```bash\n([\s\S]*?)\n```/g,
+    // Pattern 2: Escaped backticks (\`\`\`bash ... \`\`\`)
+    /\\`\\`\\`bash\n([\s\S]*?)\n\\`\\`\\`/g
+  ];
 
-    // Split by newlines in case there are multiple commands in one block
-    const commandLines = commandContent.split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.startsWith('#')); // Remove empty lines and comments
+  patterns.forEach(regex => {
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const commandContent = match[1].trim();
 
-    commands.push(...commandLines);
-  }
+      // Split by newlines in case there are multiple commands in one block
+      const commandLines = commandContent.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0 && !line.startsWith('#'));
+
+      commands.push(...commandLines);
+    }
+  });
 
   // Return distinct/unique commands only
   return [...new Set(commands)];

@@ -4,7 +4,6 @@
  */
 
 import chalk from 'chalk';
-import { listShellCommands } from './shell-commands.js';
 import { renderSystemInfo, renderHelpContent, smartRender } from './ui-renderer.js';
 import { 
   displaySessionInfo, 

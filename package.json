@@ -25,11 +25,9 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
-    "@google-cloud/vertexai": "^1.10.0",
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^1.9.0",
     "chalk": "^4.1.2",
-    "dotenv": "^17.1.0",
-    "systeminformation": "^5.27.7"
+    "dotenv": "^17.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

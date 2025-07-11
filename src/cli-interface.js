@@ -6,7 +6,6 @@
 import readline from 'readline';
 import chalk from 'chalk';
 import { initializeGoogleAI, generateContent } from './utils/google-ai-integration.js';
-import { listShellCommands } from './utils/shell-commands.js';
 import { SessionManager } from './utils/session-manager.js';
 import { handleSpecialCommands } from './utils/command-handlers.js';
 import { renderChatMessage, showBanner } from './utils/ui-renderer.js';
@@ -52,8 +51,6 @@ export async function startChatbot(config = {}) {
   });
 
   // Show available shell command keywords on startup
-  console.log(chalk.cyan('Available shell command keywords:'));
-  listShellCommands();
   console.log(chalk.cyan('\nSession commands: /save, /load, /search, /export, /analytics'));
   console.log(chalk.cyan('History features: Auto-save, backup, search, export to multiple formats'));
   console.log(chalk.gray('\nJust ask naturally - keywords will trigger shell commands!\n'));
