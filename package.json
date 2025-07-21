@@ -1,28 +1,30 @@
 {
   "name": "ai-tuning-js",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "main.mjs",
   "type": "module",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "scripts": {
     "start": "node main.mjs",
     "dev": "nodemon main.mjs"
   },
   "keywords": [
     "ai",
+    "machine-learning",
     "gemini",
     "vertex-ai",
-    "google-cloud"
+    "google-cloud",
+    "es6"
   ],
   "author": "",
-  "license": "ISC",
-  "description": "AI chatbot with Google Generative AI, auto-save, and markdown rendering",
-  "engines": {
-    "node": ">=14.0.0"
-  },
+  "license": "MIT",
+  "description": "Modern ES6+ AI chatbot with Google Generative AI integration",
   "dependencies": {
     "@google/genai": "^1.9.0",
-    "chalk": "^4.1.2",
-    "dotenv": "^17.1.0"
+    "chalk": "^5.3.0",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
