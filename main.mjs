@@ -4,33 +4,21 @@ import readline from 'readline';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
 import { promises as fs } from 'fs';
-import path from 'path';
 import Model from './src/utils/google-ai-model.js';
 
-// Load environment variables
 dotenv.config();
 
-// Constants using uppercase naming convention
 const SAVE_FILE = './save/last_session.json';
 const SAVE_FOLDER = './save';
 const MAX_HISTORY_DISPLAY = 10;
 
-/**
- * Enhanced Session Manager class using ES6+ features
- */
 class SessionManager {
-  // Private fields
   #conversationHistory = [];
   
   constructor() {
     console.log('📝 Session manager initialized');
   }
 
-  /**
-   * Add a message to conversation history
-   * @param {string} role - Message role (user/assistant)
-   * @param {string} content - Message content
-   */
   addMessage(role, content) {
     this.#conversationHistory.push({
       role,
@@ -39,25 +27,15 @@ class SessionManager {
     });
   }
 
-  /**
-   * Get conversation history
-   * @returns {Array} Conversation history array
-   */
   getConversationHistory() {
-    return [...this.#conversationHistory]; // Return a copy
+    return [...this.#conversationHistory];
   }
 
-  /**
-   * Clear conversation history
-   */
   clearHistory() {
     this.#conversationHistory.length = 0;
     console.log(chalk.green('🧹 History cleared'));
   }
 
-  /**
-   * Auto-load previous session
-   */
   async autoLoad() {
     try {
       const data = await fs.readFile(SAVE_FILE, 'utf8');
@@ -68,14 +46,10 @@ class SessionManager {
         console.log(chalk.gray(`📚 Loaded ${this.#conversationHistory.length} previous messages`));
       }
     } catch (error) {
-      // Silently fail if no previous session exists
       console.log(chalk.gray('📝 Starting fresh session'));
     }
   }
 
-  /**
-   * Auto-save current session
-   */
   async autoSave() {
     try {
       await fs.mkdir(SAVE_FOLDER, { recursive: true });
@@ -93,10 +67,6 @@ class SessionManager {
     }
   }
 
-  /**
-   * Get conversation statistics
-   * @returns {Object} Statistics about the conversation
-   */
   getStats() {
     const userMessages = this.#conversationHistory.filter(msg => msg.role === 'user').length;
     const assistantMessages = this.#conversationHistory.filter(msg => msg.role === 'assistant').length;
@@ -109,18 +79,12 @@ class SessionManager {
   }
 }
 
-/**
- * Enhanced markdown renderer with ES6+ features
- * @param {string} content - Markdown content to render
- */
 const renderMarkdown = (content) => {
   const lines = content.split('\n');
   
-  // Using for...of with modern syntax
   for (const line of lines) {
     const trimmedLine = line.trim();
     
-    // Using switch statement for better readability
     switch (true) {
       case trimmedLine.startsWith('# '):
         console.log(chalk.blue.bold(trimmedLine.substring(2)));
@@ -147,10 +111,6 @@ const renderMarkdown = (content) => {
   }
 };
 
-/**
- * Initialize AI model with error handling
- * @returns {Promise<Model>} Initialized AI model
- */
 const initializeAI = async () => {
   try {
     const model = new Model();
@@ -162,13 +122,6 @@ const initializeAI = async () => {
   }
 };
 
-/**
- * Generate AI response with conversation context
- * @param {Model} model - AI model instance
- * @param {string} input - User input
- * @param {Array} conversationHistory - Previous conversation
- * @returns {Promise<string>} AI response
- */
 const generateResponse = async (model, input, conversationHistory) => {
   try {
     let contextPrompt = '';
@@ -176,7 +129,6 @@ const generateResponse = async (model, input, conversationHistory) => {
     if (conversationHistory.length > 0) {
       contextPrompt = 'Previous conversation:\n';
       
-      // Using array methods with destructuring
       conversationHistory
         .slice(-MAX_HISTORY_DISPLAY)
         .forEach(({ role, content }) => {
@@ -194,9 +146,6 @@ const generateResponse = async (model, input, conversationHistory) => {
   }
 };
 
-/**
- * Enhanced chatbot application with ES6+ features
- */
 const startChatbot = async () => {
   console.log(chalk.blue.bold('\n🤖 AI Chatbot - Enhanced Edition'));
   console.log(chalk.gray('Commands: /exit (save & quit), /clear (clear screen & history), /stats (show statistics)\n'));
@@ -214,7 +163,6 @@ const startChatbot = async () => {
 
   rl.prompt();
 
-  // Using arrow function for event handler
   rl.on('line', async (line) => {
     const input = line.trim();
 
@@ -223,7 +171,6 @@ const startChatbot = async () => {
       return;
     }
 
-    // Enhanced command handling with switch
     switch (input) {
       case '/exit':
         console.log(chalk.yellow('🔄 Saving session...'));
@@ -277,14 +224,12 @@ const startChatbot = async () => {
     rl.prompt();
   });
 
-  // Enhanced cleanup handlers using arrow functions
   rl.on('close', async () => {
     await sessionManager.autoSave();
     console.log(chalk.green('\n👋 Chat ended gracefully.'));
     process.exit(0);
   });
 
-  // Graceful shutdown on interrupt
   process.on('SIGINT', async () => {
     console.log(chalk.yellow('\n🔄 Saving current session...'));
     await sessionManager.autoSave();
@@ -293,7 +238,6 @@ const startChatbot = async () => {
   });
 };
 
-// Application entry point with enhanced error handling
 startChatbot().catch(error => {
   console.error(chalk.red('❌ Application error:'), error.message);
   console.error(chalk.gray('Stack trace:'), error.stack);
