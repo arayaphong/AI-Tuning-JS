@@ -1,10 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Lean AI Chatbot - Minimal version with essential features only
- * Features: Google AI chat, auto-save/load, markdown rendering, /exit and /clear commands
- */
-
 import readline from 'readline';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
@@ -12,15 +7,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import Model from './src/utils/google-ai-model.js';
 
-// Load environment variables
 dotenv.config();
 
 const SAVE_FILE = './save/last_session.json';
 const SAVE_FOLDER = './save';
 
-/**
- * Simple session manager for auto-save/load functionality
- */
 class LeanSessionManager {
   constructor() {
     this.conversationHistory = [];
@@ -51,7 +42,6 @@ class LeanSessionManager {
         console.log(chalk.gray(`📚 Loaded ${this.conversationHistory.length} previous messages`));
       }
     } catch (error) {
-      // No previous session found, start fresh
     }
   }
 
@@ -70,16 +60,12 @@ class LeanSessionManager {
   }
 }
 
-/**
- * Simple markdown renderer for terminal output
- */
 function renderMarkdown(content) {
   const lines = content.split('\n');
   
   for (const line of lines) {
     const trimmedLine = line.trim();
     
-    // Handle headers
     if (trimmedLine.startsWith('# ')) {
       console.log(chalk.blue.bold(trimmedLine.substring(2)));
     } else if (trimmedLine.startsWith('## ')) {
@@ -87,29 +73,22 @@ function renderMarkdown(content) {
     } else if (trimmedLine.startsWith('### ')) {
       console.log(chalk.green.bold(trimmedLine.substring(4)));
     }
-    // Handle code blocks
     else if (trimmedLine.startsWith('```')) {
       console.log(chalk.gray(line));
     }
-    // Handle bold text
     else if (trimmedLine.includes('**')) {
       const boldText = line.replace(/\*\*(.*?)\*\*/g, chalk.bold('$1'));
       console.log(boldText);
     }
-    // Handle bullet points
     else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
       console.log(chalk.yellow('  •') + ' ' + trimmedLine.substring(2));
     }
-    // Regular text
     else {
       console.log(line);
     }
   }
 }
 
-/**
- * Initialize Google AI model
- */
 async function initializeAI() {
   try {
     return new Model();
@@ -119,15 +98,11 @@ async function initializeAI() {
   }
 }
 
-/**
- * Generate AI response with conversation context
- */
 async function generateResponse(model, input, conversationHistory) {
-  // Build context from conversation history
   let contextPrompt = '';
   if (conversationHistory.length > 0) {
     contextPrompt = 'Previous conversation:\n';
-    conversationHistory.slice(-10).forEach(msg => { // Keep last 10 messages for context
+    conversationHistory.slice(-10).forEach(msg => {
       contextPrompt += `${msg.role}: ${msg.content}\n`;
     });
     contextPrompt += '\nCurrent message:\n';
@@ -137,19 +112,13 @@ async function generateResponse(model, input, conversationHistory) {
   return await model.generateContent(fullPrompt);
 }
 
-/**
- * Main chatbot function
- */
 async function startLeanChatbot() {
-  // Show banner
   console.log(chalk.blue.bold('\n🤖 Lean AI Chatbot'));
   console.log(chalk.gray('Commands: /exit (save & quit), /clear (clear screen & history)\n'));
 
-  // Initialize components
   const model = await initializeAI();
   const sessionManager = new LeanSessionManager();
   
-  // Auto-load previous session
   await sessionManager.autoLoad();
 
   const rl = readline.createInterface({
@@ -168,7 +137,6 @@ async function startLeanChatbot() {
       return;
     }
 
-    // Handle /exit command
     if (input === '/exit') {
       console.log(chalk.yellow('🔄 Saving session...'));
       await sessionManager.autoSave();
@@ -177,7 +145,6 @@ async function startLeanChatbot() {
       return;
     }
 
-    // Handle /clear command
     if (input === '/clear') {
       console.clear();
       sessionManager.clearHistory();
@@ -188,24 +155,18 @@ async function startLeanChatbot() {
       return;
     }
 
-    // Add user message to session
     sessionManager.addMessage('user', input);
 
     try {
-      // Show processing indicator
       process.stdout.write(chalk.yellow('🤔 Processing...\r'));
 
-      // Generate AI response
       const response = await generateResponse(model, input, sessionManager.getConversationHistory());
 
-      // Clear processing indicator
       process.stdout.clearLine();
       process.stdout.cursorTo(0);
 
-      // Add AI response to session
       sessionManager.addMessage('assistant', response);
 
-      // Display response with markdown rendering
       console.log(chalk.green.bold('🤖 AI:'));
       renderMarkdown(response);
       console.log();
@@ -226,7 +187,6 @@ async function startLeanChatbot() {
     process.exit(0);
   });
 
-  // Handle Ctrl+C gracefully
   process.on('SIGINT', async () => {
     console.log(chalk.yellow('\n🔄 Saving current session...'));
     await sessionManager.autoSave();
@@ -235,7 +195,6 @@ async function startLeanChatbot() {
   });
 }
 
-// Start the lean chatbot
 startLeanChatbot().catch(error => {
   console.error('❌ Application error:', error.message);
   process.exit(1);
