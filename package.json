@@ -5,12 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node main.mjs",
-    "test": "node main.mjs --test",
-    "dev": "nodemon main.mjs",
-    "system-info": "node main.mjs --system-info",
-    "history-demo": "node examples/history-demo.js",
-    "memory-test": "node examples/memory-test.js",
-    "glow-demo": "node examples/glow-quick-demo.js"
+    "dev": "nodemon main.mjs"
   },
   "keywords": [
     "ai",
@@ -20,7 +15,7 @@
   ],
   "author": "",
   "license": "ISC",
-  "description": "Minimal Gemini AI test using Vertex AI and Google Cloud ADC authentication",
+  "description": "Lean AI chatbot with Google Generative AI, auto-save, and markdown rendering",
   "engines": {
     "node": ">=14.0.0"
   },
