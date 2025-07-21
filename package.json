@@ -15,7 +15,7 @@
   ],
   "author": "",
   "license": "ISC",
-  "description": "Lean AI chatbot with Google Generative AI, auto-save, and markdown rendering",
+  "description": "AI chatbot with Google Generative AI, auto-save, and markdown rendering",
   "engines": {
     "node": ">=14.0.0"
   },

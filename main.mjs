@@ -12,7 +12,7 @@ dotenv.config();
 const SAVE_FILE = './save/last_session.json';
 const SAVE_FOLDER = './save';
 
-class LeanSessionManager {
+class SessionManager {
   constructor() {
     this.conversationHistory = [];
   }
@@ -112,12 +112,12 @@ async function generateResponse(model, input, conversationHistory) {
   return await model.generateContent(fullPrompt);
 }
 
-async function startLeanChatbot() {
-  console.log(chalk.blue.bold('\n🤖 Lean AI Chatbot'));
+async function startChatbot() {
+  console.log(chalk.blue.bold('\n🤖 AI Chatbot'));
   console.log(chalk.gray('Commands: /exit (save & quit), /clear (clear screen & history)\n'));
 
   const model = await initializeAI();
-  const sessionManager = new LeanSessionManager();
+  const sessionManager = new SessionManager();
   
   await sessionManager.autoLoad();
 
@@ -149,7 +149,7 @@ async function startLeanChatbot() {
       console.clear();
       sessionManager.clearHistory();
       console.log(chalk.green('🧹 Screen and history cleared'));
-      console.log(chalk.blue.bold('\n🤖 Lean AI Chatbot'));
+      console.log(chalk.blue.bold('\n🤖 AI Chatbot'));
       console.log(chalk.gray('Commands: /exit (save & quit), /clear (clear screen & history)\n'));
       rl.prompt();
       return;
@@ -195,7 +195,7 @@ async function startLeanChatbot() {
   });
 }
 
-startLeanChatbot().catch(error => {
+startChatbot().catch(error => {
   console.error('❌ Application error:', error.message);
   process.exit(1);
 });
