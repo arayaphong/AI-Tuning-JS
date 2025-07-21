@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node main.mjs",
-    "dev": "nodemon main.mjs"
+    "dev": "nodemon main.mjs",
+    "test:mongodb": "node examples/mongodb-examples.mjs"
   },
   "keywords": [
     "ai",
@@ -24,7 +25,8 @@
   "dependencies": {
     "@google/genai": "^1.9.0",
     "chalk": "^5.3.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "mongodb": "^6.17.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
