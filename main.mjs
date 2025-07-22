@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { promises as fs } from 'fs';
 import Model from './src/utils/google-ai-model.js';
 import MongoDBIntegration from './src/utils/mongodb-integration.js';
+import PostgresIntegration from './src/utils/postgres-integration.js';
 
 dotenv.config();
 
@@ -187,9 +188,9 @@ const handleDatabaseCommand = async (input, sessionManager) => {
         break;
 
       case 'postgres':
-        // TODO: Implement PostgreSQL integration
-        console.log(chalk.yellow('⚠️ PostgreSQL integration not yet implemented'));
-        result = { message: 'PostgreSQL support coming soon' };
+        const postgres = new PostgresIntegration();
+        console.log(chalk.yellow('🚀 Executing PostgreSQL query:', query));
+        result = await postgres.executeQuery(query);
         break;
 
       default:
