@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import dotenv from 'dotenv';
 import { promises as fs } from 'fs';
 import Model from './src/utils/google-ai-model.js';
+import MongoDBIntegration from './src/utils/mongodb-integration.js';
 
 dotenv.config();
 
@@ -14,7 +15,7 @@ const MAX_HISTORY_DISPLAY = 10;
 
 class SessionManager {
   #conversationHistory = [];
-  
+
   constructor() {
     console.log('📝 Session manager initialized');
   }
@@ -41,7 +42,7 @@ class SessionManager {
       const data = await fs.readFile(SAVE_FILE, 'utf8');
       const session = JSON.parse(data);
       this.#conversationHistory = session.conversationHistory ?? [];
-      
+
       if (this.#conversationHistory.length > 0) {
         console.log(chalk.gray(`📚 Loaded ${this.#conversationHistory.length} previous messages`));
       }
@@ -53,13 +54,13 @@ class SessionManager {
   async autoSave() {
     try {
       await fs.mkdir(SAVE_FOLDER, { recursive: true });
-      
+
       const session = {
         conversationHistory: this.#conversationHistory,
         savedAt: new Date().toISOString(),
         version: '1.0.0'
       };
-      
+
       await fs.writeFile(SAVE_FILE, JSON.stringify(session, null, 2));
       console.log(chalk.green('💾 Session saved automatically'));
     } catch (error) {
@@ -70,7 +71,7 @@ class SessionManager {
   getStats() {
     const userMessages = this.#conversationHistory.filter(msg => msg.role === 'user').length;
     const assistantMessages = this.#conversationHistory.filter(msg => msg.role === 'assistant').length;
-    
+
     return {
       total: this.#conversationHistory.length,
       userMessages,
@@ -81,10 +82,10 @@ class SessionManager {
 
 const renderMarkdown = (content) => {
   const lines = content.split('\n');
-  
+
   for (const line of lines) {
     const trimmedLine = line.trim();
-    
+
     switch (true) {
       case trimmedLine.startsWith('# '):
         console.log(chalk.blue.bold(trimmedLine.substring(2)));
@@ -125,24 +126,85 @@ const initializeAI = async () => {
 const generateResponse = async (model, input, conversationHistory) => {
   try {
     let contextPrompt = '';
-    
+
     if (conversationHistory.length > 0) {
       contextPrompt = 'Previous conversation:\n';
-      
+
       conversationHistory
         .slice(-MAX_HISTORY_DISPLAY)
         .forEach(({ role, content }) => {
           contextPrompt += `${role}: ${content}\n`;
         });
-      
+
       contextPrompt += '\nCurrent message:\n';
     }
-    
+
     const fullPrompt = contextPrompt + input;
     return await model.generateContent(fullPrompt);
   } catch (error) {
     console.error(chalk.red('🚨 Error generating response:'), error.message);
     throw new Error(`Response generation failed: ${error.message}`);
+  }
+};
+
+const handleDatabaseCommand = async (input, sessionManager) => {
+  try {
+    const command = input.trim();
+    let dbType, query;
+
+    if (command.startsWith('#mongo ')) {
+      dbType = 'mongodb';
+      query = command.substring(7).trim();
+    } else if (command.startsWith('#postgres ')) {
+      dbType = 'postgres';
+      query = command.substring(10).trim();
+    } else {
+      return null; // Not a database command
+    }
+
+    if (!query) {
+      console.log(chalk.yellow('⚠️ Please provide a query after the database command'));
+      return null;
+    }
+
+    // Unwrap quotes for MongoDB queries
+    query = query.replace(/(^"|"$)/g, '');
+
+    let result;
+    switch (dbType) {
+      case 'mongodb':
+        const mongodb = new MongoDBIntegration();
+        console.log(chalk.yellow('🚀 Executing mongosh script:', query));
+        result = await mongodb.mongoshEval(query);
+        break;
+
+      case 'postgres':
+        // TODO: Implement PostgreSQL integration
+        console.log(chalk.yellow('⚠️ PostgreSQL integration not yet implemented'));
+        result = { message: 'PostgreSQL support coming soon' };
+        break;
+
+      default:
+        throw new Error(`Unsupported database type: ${dbType}`);
+    }
+
+    // Log the database interaction
+    sessionManager.addMessage('database', {
+      dbType: dbType,
+      query: query,
+      result: result
+    });
+
+    console.log(chalk.gray(JSON.stringify(result, null, 2)));
+    console.log(chalk.green('✅ Database query executed successfully'));
+    console.log();
+
+    return result;
+
+  } catch (error) {
+    console.error(chalk.red('🚨 Database command error:'), error.message);
+    sessionManager.addMessage('system', `Database Error: ${error.message}`);
+    return null;
   }
 };
 
@@ -152,7 +214,7 @@ const startChatbot = async () => {
 
   const model = await initializeAI();
   const sessionManager = new SessionManager();
-  
+
   await sessionManager.autoLoad();
 
   const rl = readline.createInterface({
@@ -198,7 +260,11 @@ const startChatbot = async () => {
         return;
     }
 
-    sessionManager.addMessage('user', input);
+    if (await handleDatabaseCommand(input, sessionManager)) {
+      sessionManager.addMessage('user', 'Summarize the db query result in essence');
+    } else {
+      sessionManager.addMessage('user', input);
+    }
 
     try {
       process.stdout.write(chalk.yellow('🤔 Processing...\r'));

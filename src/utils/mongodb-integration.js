@@ -5,31 +5,19 @@ import chalk from 'chalk';
 dotenv.config();
 
 /**
- * Recursively parses JSON strings within nested data structures
- * @param {any} input - Input data that may contain JSON strings
- * @returns {any} Parsed data with JSON strings converted to objects
+ * Parses MongoDB object strings to proper JSON format
+ * Converts MongoDB-specific types and syntax to valid JSON
+ * @param {string} str - MongoDB object string to parse
+ * @returns {any} Parsed JSON object
  */
-const recursiveJSONParse = (input) => {
-  if (typeof input === 'string') {
-    try {
-      const parsed = JSON.parse(input);
-      return recursiveJSONParse(parsed);  // recursive call on successful parse
-    } catch (e) {
-      return input;  // return the original string if not valid JSON
-    }
-  } 
-  
-  if (Array.isArray(input)) {
-    return input.map(recursiveJSONParse);
-  } 
-  
-  if (typeof input === 'object' && input !== null) {
-    return Object.fromEntries(
-      Object.entries(input).map(([key, value]) => [key, recursiveJSONParse(value)])
-    );
-  }
-  
-  return input;  // number, boolean, null, etc.
+const parseMongoDBObject = (str) => {
+  const converted = str
+    .replace(/ObjectId\(['"](.+?)['"]\)/g, '"$1"')
+    .replace(/ISODate\(['"](.+?)['"]\)/g, '"$1"')
+    .replace(/([{,\s])(\w+):/g, '$1"$2":')
+    .replace(/'([^']*?)'/g, '"$1"');
+
+  return JSON.parse(converted);
 };
 
 
@@ -45,7 +33,6 @@ class MongoDBIntegration {
     if (!this.#connectionString) {
       throw new Error('❌ MONGODB_URI not found in environment variables');
     }
-    console.log('🔧 MongoDB integration initialized');
   }
 
   /**
@@ -59,16 +46,11 @@ class MongoDBIntegration {
    */
   async mongoshEval(script) {
     try {
-      console.log(chalk.blue('🔄 Executing mongosh script...'));
-      console.log(chalk.gray(`Script: ${script}`));
-
       // Execute the script via mongosh
-      const result = await this.#evaluateScript(script);
-
-      console.log(chalk.green('✅ Script executed successfully'));
+      const mongoDBResult = await this.#evaluateScript(script);
 
       // Parse the JSON string to return a proper JSON object
-      return recursiveJSONParse(result);
+      return parseMongoDBObject(mongoDBResult);
     } catch (error) {
       console.error(chalk.red('❌ Script execution failed:'), error.message);
       throw error;
@@ -84,8 +66,6 @@ class MongoDBIntegration {
   async #evaluateScript(script) {
     return new Promise((resolve, reject) => {
       try {
-        console.log(chalk.blue('🚀 Executing script via mongosh...'));
-
         // Prepare mongosh command with connection string
         const mongoshArgs = [
           this.#connectionString,
