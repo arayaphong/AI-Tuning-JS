@@ -138,7 +138,7 @@ const generateResponse = async (model, input, conversationHistory) => {
       conversationHistory
         .slice(-MAX_HISTORY_DISPLAY)
         .forEach(({ role, content }) => {
-          if (role === 'database') {
+          if (role === 'executed') {
             contextPrompt += `${role}: ${JSON.stringify(content)}\n`;
           } else {
             contextPrompt += `${role}: ${content}\n`;
@@ -197,8 +197,8 @@ const handleDatabaseCommand = async (input, sessionManager) => {
         throw new Error(`Unsupported database type: ${dbType}`);
     }
 
-    // Log the database interaction
-    sessionManager.addMessage('database', {
+    // Log the executed interaction
+    sessionManager.addMessage('executed', {
       dbType: dbType,
       query: query,
       result: result
@@ -270,7 +270,7 @@ const startChatbot = async () => {
     }
 
     if (await handleDatabaseCommand(input, sessionManager)) {
-      sessionManager.addMessage('user', 'Examine recently executed database commands, describe the data only');
+      sessionManager.addMessage('user', 'Examine executed result');
     } else {
       sessionManager.addMessage('user', input);
     }
