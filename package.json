@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node main.mjs",
     "dev": "nodemon main.mjs",
-    "test:mongodb": "node examples/mongodb-examples.mjs"
+    "test:google-ai": "node examples/google-ai-examples.mjs",
+    "test:mongodb": "node examples/mongodb-examples.mjs",
+    "test:postgres": "node examples/postgres-example.mjs"
   },
   "keywords": [
     "ai",

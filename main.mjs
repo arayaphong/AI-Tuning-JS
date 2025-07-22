@@ -4,7 +4,7 @@ import readline from 'readline';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
 import { promises as fs } from 'fs';
-import Model from './src/utils/google-ai-model.js';
+import Model from './src/utils/google-ai-integration.js';
 import MongoDBIntegration from './src/utils/mongodb-integration.js';
 import PostgresIntegration from './src/utils/postgres-integration.js';
 
