@@ -99,9 +99,13 @@ const renderMarkdown = (content) => {
       case trimmedLine.startsWith('```'):
         console.log(chalk.gray(line));
         break;
+      case trimmedLine.startsWith('* '):
+        const boldText1 = line.replace(/\*(.*?)\*/g, chalk.bold('$1'));
+        console.log(boldText1);
+        break;
       case trimmedLine.includes('**'):
-        const boldText = line.replace(/\*\*(.*?)\*\*/g, chalk.bold('$1'));
-        console.log(boldText);
+        const boldText2 = line.replace(/\*\*(.*?)\*\*/g, chalk.bold('$1'));
+        console.log(boldText2);
         break;
       case trimmedLine.startsWith('- ') || trimmedLine.startsWith('* '):
         console.log(chalk.yellow('  •') + ' ' + trimmedLine.substring(2));
@@ -133,7 +137,11 @@ const generateResponse = async (model, input, conversationHistory) => {
       conversationHistory
         .slice(-MAX_HISTORY_DISPLAY)
         .forEach(({ role, content }) => {
-          contextPrompt += `${role}: ${content}\n`;
+          if (role === 'database') {
+            contextPrompt += `${role}: ${JSON.stringify(content)}\n`;
+          } else {
+            contextPrompt += `${role}: ${content}\n`;
+          }
         });
 
       contextPrompt += '\nCurrent message:\n';
@@ -261,7 +269,7 @@ const startChatbot = async () => {
     }
 
     if (await handleDatabaseCommand(input, sessionManager)) {
-      sessionManager.addMessage('user', 'Summarize the db query result in essence');
+      sessionManager.addMessage('user', 'Examine recently executed database commands, describe the data only');
     } else {
       sessionManager.addMessage('user', input);
     }
