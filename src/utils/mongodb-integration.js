@@ -5,6 +5,37 @@ import chalk from 'chalk';
 dotenv.config();
 
 /**
+ * Parses MongoDB extended JSON strings to standard JSON objects
+ * Converts MongoDB-specific types and syntax to valid JSON
+ * @param {string} str - MongoDB object string to parse
+ * @returns {any} Parsed JSON object or the original string if parsing fails
+ */
+const parseMongoDBObject = (str) => {
+  try {
+    let converted = str
+      // Handle Long
+      .replace(/Long\(['"](\d+)['"]\)/g, '$1')
+      // Handle Timestamp
+      .replace(/Timestamp\({ t: (\d+), i: (\d+) }\)/g, '{"$timestamp":{"t":$1,"i":$2}}')
+      // Handle Binary
+      .replace(/Binary.createFromBase64\(['"]([^'"]+)['"], (\d+)\)/g, '{"$binary":{"base64":"$1","subType":"$2"}}')
+      // Handle ObjectId
+      .replace(/ObjectId\(['"](.+?)['"]\)/g, '"$1"')
+      // Handle ISODate
+      .replace(/ISODate\(['"](.+?)['"]\)/g, '"$1"')
+      // Quote unquoted keys
+      .replace(/([{,\s])(\w+):/g, '$1"$2":')
+      // Replace single quotes with double quotes for strings
+      .replace(/'([^']*?)'/g, '"$1"');
+
+    return JSON.parse(converted);
+  } catch (error) {
+    // If parsing fails, return the original string
+    return str;
+  }
+};
+
+/**
  * MongoDB Integration Utility
  * Provides an interactive interface for executing MongoDB shell commands via mongosh
  */
@@ -79,8 +110,8 @@ class MongoDBIntegration {
    */
   #processOutput() {
     // Split the buffer into lines
-    const lines = this.#outputBuffer.split('\n');
-    const lastLine = lines[lines.length - 1].trim();
+    const lines = this.#outputBuffer.split(/\r?\n/);
+    const lastLine = lines[lines.length - 1]?.trim() || '';
 
     // Check if the last line is a prompt (ends with '>')
     if (lastLine.endsWith('>')) {
@@ -94,8 +125,17 @@ class MongoDBIntegration {
         // Initial prompt detected, set ready and process next command
         this.#ready = true;
       } else if (this.#currentResolve) {
-        // Resolve the current command with the raw output string
-        this.#currentResolve(commandOutput);
+        // Handle 'show dbs' specifically to return raw string
+        if (this.#commandQueue[0]?.script === 'show dbs') {
+          this.#currentResolve(commandOutput);
+        } else {
+          // Try to parse JSON-like output
+          let result = commandOutput;
+          if (commandOutput.startsWith('{') || commandOutput.startsWith('[')) {
+            result = parseMongoDBObject(commandOutput);
+          }
+          this.#currentResolve(result);
+        }
         this.#clearCurrentCommand();
       }
 
@@ -131,8 +171,7 @@ class MongoDBIntegration {
   /**
    * Executes a MongoDB shell script interactively
    * @param {string} script - MongoDB shell script to execute
-   * @returns {Promise<string>} Script execution result as raw string
-   * @throws {Error} If mongosh process is not running or command fails
+   * @returns {Promise<any>} Script execution result (string for 'show dbs', parsed object for JSON-like output)
    */
   async mongoshEval(script) {
     if (!this.#mongoshProcess || this.#mongoshProcess.killed) {

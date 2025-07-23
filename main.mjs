@@ -161,7 +161,7 @@ const generateResponse = async (model, role, input, sessionManager) => {
 
 const handleResponseExecution = async (response, sessionManager) => {
   const extractedScript = () => {
-    const regex = /```javascript\s*([\s\S]*?)\s*```/;
+    const regex = /```(?:javascript|mongodb)\s*([\s\S]*?)\s*```/;
     const match = response.match(regex);
     return (match && match[1]) ? match[1].trim() : null; // No script found
   };
@@ -271,7 +271,7 @@ const startChatbot = async () => {
       process.stdout.write(chalk.yellow('🤔 Processing...\r'));
 
       let response = await generateResponse(model, 'user', input, sessionManager);
-      if (await handleResponseExecution(response, sessionManager)) {
+      while (await handleResponseExecution(response, sessionManager)) {
         response = await generateResponse(model, 'agent', null, sessionManager); // Agent asks follow-up
       }
 

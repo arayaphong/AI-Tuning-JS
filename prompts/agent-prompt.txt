@@ -1,3 +1,1 @@
 Is that enough to you to answer the user question?
-If yes just answer.
-If you need gathers more from MongoDB and/or PostgreSQL respond the mongosh script or SQL.
