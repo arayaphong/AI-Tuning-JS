@@ -128,93 +128,91 @@ const initializeAI = async () => {
   }
 };
 
-const generateResponse = async (model, input, conversationHistory) => {
+const generateResponse = async (model, role, input, sessionManager) => {
   try {
-    let contextPrompt = '';
+    const conversationHistory = sessionManager.getConversationHistory();
+    let contextPrompt = await fs.readFile('prompts/main-prompt.txt', 'utf8');
 
     if (conversationHistory.length > 0) {
-      contextPrompt = 'Previous conversation:\n';
+      contextPrompt += 'Previous conversation:\n';
 
       conversationHistory
         .slice(-MAX_HISTORY_DISPLAY)
         .forEach(({ role, content }) => {
-          if (role === 'executed') {
+          if (role === 'execution') {
             contextPrompt += `${role}: ${JSON.stringify(content)}\n`;
           } else {
             contextPrompt += `${role}: ${content}\n`;
           }
         });
 
-      contextPrompt += '\nCurrent message:\n';
+      contextPrompt += `\nCurrent message (${role}) :\n`;
     }
 
-    const fullPrompt = contextPrompt + input;
-    return await model.generateContent(fullPrompt);
+    // Add the latest message to the conversation history
+    input = role === 'agent' ? await fs.readFile('prompts/agent-prompt.txt', 'utf8') : input;
+    sessionManager.addMessage(role, input);
+    return await model.generateContent(contextPrompt + input);
   } catch (error) {
     console.error(chalk.red('🚨 Error generating response:'), error.message);
     throw new Error(`Response generation failed: ${error.message}`);
   }
 };
 
-const handleDatabaseCommand = async (input, sessionManager) => {
-  try {
-    const command = input.trim();
-    let dbType, query;
+const handleResponseExecution = async (response, sessionManager) => {
+  const extractedScript = () => {
+    const regex = /```javascript\s*([\s\S]*?)\s*```/;
+    const match = response.match(regex);
+    return (match && match[1]) ? match[1].trim() : null; // No script found
+  };
 
-    if (command.startsWith('#mongo ')) {
-      dbType = 'mongodb';
-      query = command.substring(7).trim();
-    } else if (command.startsWith('#postgres ')) {
-      dbType = 'postgres';
-      query = command.substring(10).trim();
-    } else {
-      return null; // Not a database command
-    }
+  const extractedSQL = () => {
+    const regex = /```sql\s*([\s\S]*?)\s*```/;
+    const match = response.match(regex);
+    return (match && match[1]) ? match[1].trim() : null;
+  };
 
-    if (!query) {
-      console.log(chalk.yellow('⚠️ Please provide a query after the database command'));
-      return null;
-    }
+  const mongoshEval = extractedScript();
+  const sqlQuery = extractedSQL();
+  if (!mongoshEval && !sqlQuery) return null; // No execution commands found
 
-    // Unwrap quotes for MongoDB queries
-    query = query.replace(/(^"|"$)/g, '');
-
-    let result;
-    switch (dbType) {
-      case 'mongodb':
-        const mongodb = new MongoDBIntegration();
-        console.log(chalk.yellow('🚀 Executing mongosh script:', query));
-        result = await mongodb.mongoshEval(query);
-        break;
-
-      case 'postgres':
-        const postgres = new PostgresIntegration();
-        console.log(chalk.yellow('🚀 Executing PostgreSQL query:', query));
-        result = await postgres.executeQuery(query);
-        break;
-
-      default:
-        throw new Error(`Unsupported database type: ${dbType}`);
-    }
-
-    // Log the executed interaction
-    sessionManager.addMessage('executed', {
-      dbType: dbType,
-      query: query,
-      result: result
-    });
-
-    console.log(chalk.gray(JSON.stringify(result, null, 2)));
-    console.log(chalk.green('✅ Database query executed successfully'));
-    console.log();
-
-    return result;
-
-  } catch (error) {
-    console.error(chalk.red('🚨 Database command error:'), error.message);
-    sessionManager.addMessage('system', `Database Error: ${error.message}`);
-    return null;
+  let mongoJson;
+  if (mongoshEval) {
+    console.log(chalk.yellow('🚀 Executing MongoDB script:', mongoshEval));
+    const mongodb = new MongoDBIntegration();
+    mongoJson = {
+      query: mongoshEval,
+      result: await mongodb.mongoshEval(mongoshEval)
+    };
+    mongodb.close();
   }
+
+  let sqlJson;
+  if (sqlQuery) {
+    console.log(chalk.yellow('🚀 Executing SQL query:', sqlQuery));
+    const postgres = new PostgresIntegration();
+    sqlJson = {
+      query: sqlQuery,
+      result: await postgres.executeQuery(sqlQuery)
+    };
+  }
+
+  let resultJson = {};
+  if (mongoJson) {
+    resultJson.mongodb = mongoJson;
+  }
+  if (sqlJson) {
+    resultJson.postgres = sqlJson;
+  }
+
+  // Log the execution interaction
+  sessionManager.addMessage('execution', resultJson);
+
+  console.log(chalk.gray(JSON.stringify(resultJson, null, 2)));
+  console.log(chalk.green('✅ Database query execution successfully'));
+  console.log();
+
+  return resultJson;
 };
 
 const startChatbot = async () => {
@@ -269,16 +267,13 @@ const startChatbot = async () => {
         return;
     }
 
-    if (await handleDatabaseCommand(input, sessionManager)) {
-      sessionManager.addMessage('user', 'Examine executed result');
-    } else {
-      sessionManager.addMessage('user', input);
-    }
-
     try {
       process.stdout.write(chalk.yellow('🤔 Processing...\r'));
 
-      const response = await generateResponse(model, input, sessionManager.getConversationHistory());
+      let response = await generateResponse(model, 'user', input, sessionManager);
+      if (await handleResponseExecution(response, sessionManager)) {
+        response = await generateResponse(model, 'agent', null, sessionManager); // Agent asks follow-up
+      }
 
       process.stdout.clearLine();
       process.stdout.cursorTo(0);
