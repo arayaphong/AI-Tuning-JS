@@ -30,6 +30,17 @@ async function runMongoDBExamples() {
       console.log(chalk.yellow('⚠️ Could not access history_near_by_location collection (may not exist)'));
     }
 
+    // Example 3: List all databases
+    console.log(chalk.cyan('\n📋 Example 3: List all databases'));
+    try {
+      const allDatabases = await mongodb.mongoshEval("show dbs");
+      console.log('All databases:', allDatabases);
+    } catch (error) {
+      console.log(chalk.yellow('⚠️ Could not list databases'));
+    }
+
+    mongodb.close();
+
     console.log(chalk.green('\n✅ All mongoshEval examples completed successfully!'));
     
   } catch (error) {
