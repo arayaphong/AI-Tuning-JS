@@ -3,12 +3,14 @@ import { GoogleGenAI } from '@google/genai';
 class Model {
     #ai;
     #model;
+    #embeddingModel;
     #generationConfig;
 
     static DEFAULT_CONFIG = {
         project: 'gen-lang-client-0312359180',
         location: 'global',
         model: 'gemini-2.5-flash',
+        embeddingModel: 'text-embedding-004',
         maxOutputTokens: 65535,
         temperature: 1,
         topP: 1,
@@ -58,6 +60,9 @@ class Model {
             safetySettings: Model.SAFETY_SETTINGS,
             ...generationConfig
         };
+
+        console.log(`✅ Generative Model Initialized: ${this.#model}`);
+        console.log(`✅ Embedding Model Initialized: ${this.#embeddingModel}`);
     }
 
     async generateContent(prompt) {
@@ -82,6 +87,22 @@ class Model {
         } catch (error) {
             console.error('🚨 Error generating content:', error.message);
             throw new Error(`AI content generation failed: ${error.message}`);
+        }
+    }
+
+    async getEmbedding(text) {
+        try {
+            const req = {
+                model: this.#embeddingModel,
+                content: {
+                    parts: [{ text: text }]
+                }
+            };
+            const result = await this.#ai.models.embedContent(req);
+            return result.embedding.values;
+        } catch (error) {
+            console.error('🚨 Error generating embedding:', error.message);
+            throw new Error(`AI embedding generation failed: ${error.message}`);
         }
     }
 

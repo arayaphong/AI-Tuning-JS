@@ -7,6 +7,7 @@ import { promises as fs } from 'fs';
 import Model from './src/utils/google-ai-integration.js';
 import MongoDBIntegration from './src/utils/mongodb-integration.js';
 import PostgresIntegration from './src/utils/postgres-integration.js';
+import VectorSearch from './src/utils/vector-search-integration.js';
 
 dotenv.config();
 
@@ -128,10 +129,26 @@ const initializeAI = async () => {
   }
 };
 
-const generateResponse = async (model, role, input, sessionManager) => {
+const generateResponse = async (model, role, input, sessionManager, vectorSearch) => {
   try {
     const conversationHistory = sessionManager.getConversationHistory();
     let contextPrompt = await fs.readFile('prompts/main-prompt.txt', 'utf8');
+
+    // --- NEW: RAG - Retrieval Phase ---
+    process.stdout.write(chalk.yellow('🔍 Searching long-term memory...\r'));
+    const queryEmbedding = await model.getEmbedding(input);
+    const relevantHistory = await vectorSearch.search(queryEmbedding, 5); // Find top 5 relevant memories
+    process.stdout.clearLine();
+    process.stdout.cursorTo(0);
+    
+    if (relevantHistory.length > 0) {
+        contextPrompt += 'This is some relevant information from past conversations (long-term memory):\n';
+        relevantHistory.forEach(memory => {
+            contextPrompt += `- ${memory}\n`;
+        });
+        contextPrompt += '\n';
+    }
+    // --- END RAG ---
 
     if (conversationHistory.length > 0) {
       contextPrompt += 'Previous conversation:\n';
@@ -152,6 +169,7 @@ const generateResponse = async (model, role, input, sessionManager) => {
     // Add the latest message to the conversation history
     input = role === 'agent' ? await fs.readFile('prompts/agent-prompt.txt', 'utf8') : input;
     sessionManager.addMessage(role, input);
+
     return await model.generateContent(contextPrompt + input);
   } catch (error) {
     console.error(chalk.red('🚨 Error generating response:'), error.message);
@@ -221,6 +239,7 @@ const startChatbot = async () => {
 
   const model = await initializeAI();
   const sessionManager = new SessionManager();
+  const vectorSearch = new VectorSearch();
 
   await sessionManager.autoLoad();
 
@@ -283,6 +302,13 @@ const startChatbot = async () => {
       console.log(chalk.green.bold('🤖 AI:'));
       renderMarkdown(response);
       console.log();
+
+      // --- NEW: RAG - Save to Memory Phase ---
+      //TODO: It should save all roles conversation (User, Assistant, Execution and Agent) from last user question to final answer.
+      const turnToSave = `User: "${input}" | AI: "${response.replace(/\n/g, ' ')}"`;
+      const turnEmbedding = await model.getEmbedding(turnToSave);
+      await vectorSearch.save(turnToSave, turnEmbedding);
+      // --- END RAG ---
 
     } catch (error) {
       process.stdout.clearLine();
