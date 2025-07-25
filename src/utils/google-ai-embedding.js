@@ -7,10 +7,15 @@ class GoogleAIEmbedding {
     constructor(options = {}) {
         // For Google AI embeddings, we can use API key authentication
         this.apiKey = process.env.GOOGLE_API_KEY;
+        this.model = options.model || process.env.GOOGLE_AI_EMBEDDING_MODEL;
         
         if (!this.apiKey) {
             console.warn('⚠️  GOOGLE_API_KEY not found, Google AI embeddings unavailable');
             throw new Error('Google API key required for Google AI embeddings');
+        }
+
+        if (!this.model) {
+            throw new Error('Google AI embedding model is required. Set GOOGLE_AI_EMBEDDING_MODEL environment variable or pass model in options.');
         }
 
         this.client = new GoogleGenerativeAI(this.apiKey);
@@ -27,7 +32,7 @@ class GoogleAIEmbedding {
             console.log('🔍 Generating embedding using Google AI...');
             
             // Use the embedding model
-            const model = this.client.getGenerativeModel({ model: 'embedding-001' });
+            const model = this.client.getGenerativeModel({ model: this.model });
             const result = await model.embedContent(text.trim());
             
             if (result.embedding && result.embedding.values) {

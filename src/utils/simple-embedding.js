@@ -1,9 +1,20 @@
 import crypto from 'crypto';
 
 class SimpleEmbedding {
-    constructor() {
-        this.dimensions = 768; // Match Vertex AI dimensions
-        console.log(`✅ Simple Local Embedding Client Initialized (Fallback)`);
+    constructor(options = {}) {
+        this.dimensions = options.dimensions || (process.env.SIMPLE_EMBEDDING_DIMENSIONS ? parseInt(process.env.SIMPLE_EMBEDDING_DIMENSIONS) : undefined);
+        
+        if (!this.dimensions) {
+            throw new Error('Embedding dimensions are required. Set SIMPLE_EMBEDDING_DIMENSIONS environment variable or pass dimensions in options.');
+        }
+
+        this.maxHashValue = options.maxHashValue || (process.env.SIMPLE_EMBEDDING_MAX_HASH_VALUE ? parseFloat(process.env.SIMPLE_EMBEDDING_MAX_HASH_VALUE) : undefined);
+        
+        if (!this.maxHashValue) {
+            throw new Error('Max hash value for normalization is required. Set SIMPLE_EMBEDDING_MAX_HASH_VALUE environment variable or pass maxHashValue in options.');
+        }
+
+        console.log(`✅ Simple Local Embedding Client Initialized (Fallback) - ${this.dimensions} dimensions`);
     }
 
     async getEmbedding(text) {
@@ -50,7 +61,7 @@ class SimpleEmbedding {
             // Take 4 hex chars and convert to float
             const hexChars = hashes[hashIndex].substr(charIndex, 4);
             const intValue = parseInt(hexChars, 16);
-            const normalizedValue = (intValue / 65535.0) - 0.5; // Normalize to [-0.5, 0.5]
+            const normalizedValue = (intValue / this.maxHashValue) - 0.5; // Normalize to [-0.5, 0.5]
             
             embedding.push(normalizedValue);
             charIndex += 4;

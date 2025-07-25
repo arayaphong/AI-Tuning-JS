@@ -11,32 +11,32 @@ class Model {
     #embeddingClients;
 
     static DEFAULT_CONFIG = {
-        project: 'gen-lang-client-0312359180',
-        location: 'us-central1',
-        model: 'gemini-2.5-flash',
-        embeddingModel: 'text-embedding-004',
-        maxOutputTokens: 65535,
-        temperature: 1,
-        topP: 1,
-        seed: 0
+        project: process.env.GOOGLE_CLOUD_PROJECT,
+        location: process.env.GOOGLE_CLOUD_LOCATION,
+        model: process.env.GOOGLE_CLOUD_VERTEX_MODEL,
+        embeddingModel: process.env.VERTEX_AI_MODEL,
+        maxOutputTokens: process.env.MAX_OUTPUT_TOKENS ? parseInt(process.env.MAX_OUTPUT_TOKENS) : undefined,
+        temperature: process.env.TEMPERATURE ? parseFloat(process.env.TEMPERATURE) : undefined,
+        topP: process.env.TOP_P ? parseFloat(process.env.TOP_P) : undefined,
+        seed: process.env.SEED ? parseInt(process.env.SEED) : undefined
     };
 
     static SAFETY_SETTINGS = [
         {
-            category: 'HARM_CATEGORY_HATE_SPEECH',
-            threshold: 'OFF',
+            category: process.env.HARM_CATEGORY_HATE_SPEECH,
+            threshold: process.env.SAFETY_THRESHOLD,
         },
         {
-            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-            threshold: 'OFF',
+            category: process.env.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold: process.env.SAFETY_THRESHOLD,
         },
         {
-            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-            threshold: 'OFF',
+            category: process.env.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold: process.env.SAFETY_THRESHOLD,
         },
         {
-            category: 'HARM_CATEGORY_HARASSMENT',
-            threshold: 'OFF',
+            category: process.env.HARM_CATEGORY_HARASSMENT,
+            threshold: process.env.SAFETY_THRESHOLD,
         },
     ];
 
@@ -48,6 +48,36 @@ class Model {
             embeddingModel = Model.DEFAULT_CONFIG.embeddingModel,
             generationConfig = {}
         } = options;
+
+        // Validate required parameters
+        if (!project) {
+            throw new Error('Google Cloud Project ID is required. Set GOOGLE_CLOUD_PROJECT environment variable or pass project in options.');
+        }
+        if (!location) {
+            throw new Error('Google Cloud Location is required. Set GOOGLE_CLOUD_LOCATION environment variable or pass location in options.');
+        }
+        if (!model) {
+            throw new Error('Google Cloud Vertex Model is required. Set GOOGLE_CLOUD_VERTEX_MODEL environment variable or pass model in options.');
+        }
+        if (!embeddingModel) {
+            throw new Error('Vertex AI Model is required. Set VERTEX_AI_MODEL environment variable or pass embeddingModel in options.');
+        }
+
+        // Validate configuration parameters
+        const requiredConfig = ['maxOutputTokens', 'temperature', 'topP', 'seed'];
+        for (const param of requiredConfig) {
+            if (Model.DEFAULT_CONFIG[param] === undefined) {
+                throw new Error(`${param.toUpperCase()} is required. Set ${param.toUpperCase()} environment variable.`);
+            }
+        }
+
+        // Validate safety settings
+        const validSafetySettings = Model.SAFETY_SETTINGS.filter(setting => 
+            setting.category && setting.threshold
+        );
+        if (validSafetySettings.length === 0) {
+            throw new Error('Safety settings are required. Set HARM_CATEGORY_* and SAFETY_THRESHOLD environment variables.');
+        }
 
         this.#ai = new GoogleGenAI({
             vertexai: true,
@@ -63,7 +93,7 @@ class Model {
             temperature: Model.DEFAULT_CONFIG.temperature,
             topP: Model.DEFAULT_CONFIG.topP,
             seed: Model.DEFAULT_CONFIG.seed,
-            safetySettings: Model.SAFETY_SETTINGS,
+            safetySettings: validSafetySettings,
             ...generationConfig
         };
 
