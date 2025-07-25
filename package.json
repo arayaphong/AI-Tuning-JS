@@ -11,7 +11,8 @@
     "dev": "nodemon main.mjs",
     "test:google-ai": "node examples/google-ai-examples.mjs",
     "test:mongodb": "node examples/mongodb-examples.mjs",
-    "test:postgres": "node examples/postgres-example.mjs"
+    "test:postgres": "node examples/postgres-example.mjs",
+    "test:vector": "node examples/vector-search-example.mjs"
   },
   "keywords": [
     "ai",
@@ -27,6 +28,7 @@
   "dependencies": {
     "@google-cloud/aiplatform": "^5.0.0",
     "@google/genai": "^1.9.0",
+    "@google/generative-ai": "^0.24.1",
     "chalk": "^5.3.0",
     "dotenv": "^16.4.5",
     "mongodb": "^6.17.0",

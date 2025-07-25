@@ -25,22 +25,31 @@ class VectorSearch {
     }
 
     async search(vector, numNeighbors = 5) {
-        const request = {
-            indexEndpoint: this.indexEndpointClient.indexEndpointPath(PROJECT_ID, LOCATION, INDEX_ENDPOINT_ID),
-            deployedIndexId: DEPLOYED_INDEX_ID,
-            queries: [{
-                vector: { value: vector },
-                neighborCount: numNeighbors,
-            }],
-        };
+        try {
+            const request = {
+                indexEndpoint: this.indexEndpointClient.indexEndpointPath(PROJECT_ID, LOCATION, INDEX_ENDPOINT_ID),
+                deployedIndexId: DEPLOYED_INDEX_ID,
+                queries: [{
+                    datapoint: {
+                        datapointId: 'query',
+                        featureVector: { value: vector }
+                    },
+                    neighborCount: numNeighbors,
+                }],
+            };
 
-        const [response] = await this.indexEndpointClient.findNeighbors(request);
-        if (!response.nearestNeighbors || !response.nearestNeighbors[0].neighbors) {
-            return [];
+            const [response] = await this.indexEndpointClient.findNeighbors(request);
+            if (!response.nearestNeighbors || !response.nearestNeighbors[0].neighbors) {
+                return [];
+            }
+
+            const neighbors = response.nearestNeighbors[0].neighbors;
+            return neighbors.map(neighbor => neighbor.datapoint.datapointId);
+        } catch (error) {
+            console.error('🚨 Vector search error:', error.message);
+            console.log('⚠️  Returning empty results due to vector search error');
+            return []; // Return empty array instead of crashing
         }
-
-        const neighbors = response.nearestNeighbors[0].neighbors;
-        return neighbors.map(neighbor => neighbor.datapoint.datapointId);
     }
 
     async save(id, vector) {

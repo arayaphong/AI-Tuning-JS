@@ -1,14 +1,18 @@
 import { GoogleGenAI } from '@google/genai';
+import VertexAIEmbeddingREST from './vertex-ai-embedding-rest.js';
+import GoogleAIEmbedding from './google-ai-embedding.js';
+import SimpleEmbedding from './simple-embedding.js';
 
 class Model {
     #ai;
     #model;
     #embeddingModel;
     #generationConfig;
+    #embeddingClients;
 
     static DEFAULT_CONFIG = {
         project: 'gen-lang-client-0312359180',
-        location: 'global',
+        location: 'us-central1',
         model: 'gemini-2.5-flash',
         embeddingModel: 'text-embedding-004',
         maxOutputTokens: 65535,
@@ -41,6 +45,7 @@ class Model {
             project = Model.DEFAULT_CONFIG.project,
             location = Model.DEFAULT_CONFIG.location,
             model = Model.DEFAULT_CONFIG.model,
+            embeddingModel = Model.DEFAULT_CONFIG.embeddingModel,
             generationConfig = {}
         } = options;
 
@@ -51,6 +56,7 @@ class Model {
         });
         
         this.#model = model;
+        this.#embeddingModel = embeddingModel;
 
         this.#generationConfig = {
             maxOutputTokens: Model.DEFAULT_CONFIG.maxOutputTokens,
@@ -60,6 +66,37 @@ class Model {
             safetySettings: Model.SAFETY_SETTINGS,
             ...generationConfig
         };
+
+        // Initialize embedding client with fallback options
+        this.#embeddingClients = [];
+        
+        // Try Vertex AI first (using REST client)
+        try {
+            const vertexAI = new VertexAIEmbeddingREST({
+                project,
+                location,
+                model: embeddingModel
+            });
+            this.#embeddingClients.push({ client: vertexAI, name: 'Vertex AI' });
+        } catch (error) {
+            console.warn('⚠️  Vertex AI embedding not available');
+        }
+
+        // Try Google AI as second option (uses API key)
+        try {
+            const googleAI = new GoogleAIEmbedding();
+            this.#embeddingClients.push({ client: googleAI, name: 'Google AI' });
+        } catch (error) {
+            console.warn('⚠️  Google AI embedding not available');
+        }
+
+        // Always add Simple embedding as final fallback
+        try {
+            const simpleEmbedding = new SimpleEmbedding();
+            this.#embeddingClients.push({ client: simpleEmbedding, name: 'Simple Hash' });
+        } catch (error) {
+            console.warn('⚠️  Simple embedding fallback failed');
+        }
 
         console.log(`✅ Generative Model Initialized: ${this.#model}`);
         console.log(`✅ Embedding Model Initialized: ${this.#embeddingModel}`);
@@ -91,19 +128,21 @@ class Model {
     }
 
     async getEmbedding(text) {
-        try {
-            const req = {
-                model: this.#embeddingModel,
-                content: {
-                    parts: [{ text: text }]
-                }
-            };
-            const result = await this.#ai.models.embedContent(req);
-            return result.embedding.values;
-        } catch (error) {
-            console.error('🚨 Error generating embedding:', error.message);
-            throw new Error(`AI embedding generation failed: ${error.message}`);
+        // Try each embedding client in order until one succeeds
+        for (const { client, name } of this.#embeddingClients) {
+            try {
+                console.log(`🔍 Attempting embedding with ${name}...`);
+                const embedding = await client.getEmbedding(text);
+                console.log(`✅ Embedding successful with ${name}`);
+                return embedding;
+            } catch (error) {
+                console.warn(`⚠️  ${name} embedding failed: ${error.message}`);
+                continue; // Try next client
+            }
         }
+        
+        // If all clients fail, throw error
+        throw new Error('All embedding clients failed');
     }
 
     get model() {

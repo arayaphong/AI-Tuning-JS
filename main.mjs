@@ -7,7 +7,7 @@ import { promises as fs } from 'fs';
 import Model from './src/utils/google-ai-integration.js';
 import MongoDBIntegration from './src/utils/mongodb-integration.js';
 import PostgresIntegration from './src/utils/postgres-integration.js';
-import VectorSearch from './src/utils/vector-search-integration.js';
+import VectorSearch from './src/utils/vector-search-integration-v2.js';
 
 dotenv.config();
 
@@ -134,19 +134,25 @@ const generateResponse = async (model, role, input, sessionManager, vectorSearch
     const conversationHistory = sessionManager.getConversationHistory();
     let contextPrompt = await fs.readFile('prompts/main-prompt.txt', 'utf8');
 
-    // --- NEW: RAG - Retrieval Phase ---
+    // --- RAG - Retrieval Phase ---
     process.stdout.write(chalk.yellow('🔍 Searching long-term memory...\r'));
-    const queryEmbedding = await model.getEmbedding(input);
-    const relevantHistory = await vectorSearch.search(queryEmbedding, 5); // Find top 5 relevant memories
-    process.stdout.clearLine();
-    process.stdout.cursorTo(0);
-    
-    if (relevantHistory.length > 0) {
-        contextPrompt += 'This is some relevant information from past conversations (long-term memory):\n';
-        relevantHistory.forEach(memory => {
-            contextPrompt += `- ${memory}\n`;
-        });
-        contextPrompt += '\n';
+    try {
+        const queryEmbedding = await model.getEmbedding(input);
+        const relevantHistory = await vectorSearch.search(queryEmbedding, 5); // Find top 5 relevant memories
+        process.stdout.clearLine();
+        process.stdout.cursorTo(0);
+        
+        if (relevantHistory.length > 0) {
+            contextPrompt += 'This is some relevant information from past conversations (long-term memory):\n';
+            relevantHistory.forEach(memory => {
+                contextPrompt += `- ${memory}\n`;
+            });
+            contextPrompt += '\n';
+        }
+    } catch (error) {
+        process.stdout.clearLine();
+        process.stdout.cursorTo(0);
+        console.log(chalk.gray('⚠️  Vector search unavailable, continuing without long-term memory'));
     }
     // --- END RAG ---
 
@@ -289,9 +295,9 @@ const startChatbot = async () => {
     try {
       process.stdout.write(chalk.yellow('🤔 Processing...\r'));
 
-      let response = await generateResponse(model, 'user', input, sessionManager);
+      let response = await generateResponse(model, 'user', input, sessionManager, vectorSearch);
       while (await handleResponseExecution(response, sessionManager)) {
-        response = await generateResponse(model, 'agent', null, sessionManager); // Agent asks follow-up
+        response = await generateResponse(model, 'agent', null, sessionManager, vectorSearch); // Agent asks follow-up
       }
 
       process.stdout.clearLine();
@@ -303,11 +309,16 @@ const startChatbot = async () => {
       renderMarkdown(response);
       console.log();
 
-      // --- NEW: RAG - Save to Memory Phase ---
-      //TODO: It should save all roles conversation (User, Assistant, Execution and Agent) from last user question to final answer.
-      const turnToSave = `User: "${input}" | AI: "${response.replace(/\n/g, ' ')}"`;
-      const turnEmbedding = await model.getEmbedding(turnToSave);
-      await vectorSearch.save(turnToSave, turnEmbedding);
+      // --- RAG - Save to Memory Phase ---
+      try {
+        //TODO: It should save all roles conversation (User, Assistant, Execution and Agent) from last user question to final answer.
+        const turnToSave = `User: "${input}" | AI: "${response.replace(/\n/g, ' ')}"`;
+        const turnEmbedding = await model.getEmbedding(turnToSave);
+        await vectorSearch.save(turnToSave, turnEmbedding);
+        console.log(chalk.gray('💾 Conversation saved to long-term memory'));
+      } catch (error) {
+        console.log(chalk.gray('⚠️  Could not save to long-term memory:', error.message));
+      }
       // --- END RAG ---
 
     } catch (error) {
